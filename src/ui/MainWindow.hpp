@@ -7,6 +7,7 @@
 
 class QFrame;
 class QLabel;
+class QMenu;
 class QContextMenuEvent;
 
 namespace qworldclock {
@@ -33,6 +34,8 @@ private:
     void onToggleEditMode(bool checked);
     void onAlignmentChanged(QAction *action);
     void onSizingModeChanged(QAction *action);
+    void onClockSizeChanged(QAction *action);
+    void onCustomClockSize();
     void onToggleMenuBar(bool checked);
     void onToggleStatusBar(bool checked);
     void onToggleSeconds(bool checked);
@@ -46,6 +49,8 @@ private:
 
     QLabel *m_statusLabel{nullptr};
     QAction *m_editModeAction{nullptr};
+    QAction *m_responsiveModeAction{nullptr};
+    QAction *m_fixedModeAction{nullptr};
     QAction *m_toggleMenuBarAction{nullptr};
     QAction *m_toggleStatusBarAction{nullptr};
     QAction *m_toggleSecondsAction{nullptr};
@@ -53,6 +58,8 @@ private:
     QAction *m_exitAction{nullptr};
     QActionGroup *m_alignmentGroup{nullptr};
     QActionGroup *m_sizingGroup{nullptr};
+    QActionGroup *m_clockSizeGroup{nullptr};
+    QMenu *m_clockSizeMenu{nullptr};
 
     bool m_showSeconds{true};
     bool m_showDayNight{true};

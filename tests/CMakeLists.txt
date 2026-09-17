@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Core Test)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Test)
 
 add_executable(test_grid_model
     TestGridModel.cpp
@@ -15,3 +15,30 @@ target_link_libraries(test_grid_model PRIVATE
 )
 
 add_test(NAME GridModelTest COMMAND test_grid_model)
+
+# Window UI test
+add_executable(test_window
+    TestWindow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/GridModel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/TimeEngine.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/AnalogClockWidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/CaptionLabel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/ClockCardWidget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/ClockGridPanel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/MainWindow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/TimeZoneDialog.cpp
+)
+
+target_include_directories(test_window PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+
+target_link_libraries(test_window PRIVATE
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::Test
+    tomlplusplus::tomlplusplus
+)
+
+add_test(NAME WindowTest COMMAND test_window)

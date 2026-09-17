@@ -5,6 +5,7 @@
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QMenu>
+#include <QResizeEvent>
 #include <QUuid>
 
 namespace qworldclock {
@@ -26,7 +27,7 @@ GridModel *ClockGridPanel::model() const {
 void ClockGridPanel::setGridAlignment(Qt::Alignment alignment) {
     if (m_alignment != alignment) {
         m_alignment = alignment;
-        updateAlignmentSpacers();
+        updateAlignment();
     }
 }
 
@@ -49,8 +50,125 @@ bool ClockGridPanel::isEditMode() const {
     return m_editMode;
 }
 
+void ClockGridPanel::setSizingMode(SizingMode mode) {
+    if (m_sizingMode != mode) {
+        m_sizingMode = mode;
+        updateCardSizes();
+    }
+}
+
+SizingMode ClockGridPanel::sizingMode() const {
+    return m_sizingMode;
+}
+
+void ClockGridPanel::setFixedClockSize(int size) {
+    const int clamped = qBound(100, size, 500);
+    if (m_fixedClockSize != clamped) {
+        m_fixedClockSize = clamped;
+        if (m_sizingMode == SizingMode::Fixed) {
+            updateCardSizes();
+        }
+    }
+}
+
+int ClockGridPanel::fixedClockSize() const {
+    return m_fixedClockSize;
+}
+
+void ClockGridPanel::applySizingToCard(ClockCardWidget *card) {
+    if (!card) {
+        return;
+    }
+    if (m_sizingMode == SizingMode::Fixed) {
+        card->setFixedClockSize(m_fixedClockSize);
+    } else {
+        card->setClockDiameter(card->clockDiameter());
+    }
+}
+
 ClockCardWidget *ClockGridPanel::cardWidget(const QString &id) const {
     return m_cardWidgets.value(id, nullptr);
+}
+
+void ClockGridPanel::updateCardSizes() {
+    if (!m_model || m_model->count() == 0) {
+        return;
+    }
+
+    const int rows = qMax(1, m_model->rowCount());
+    const int cols = qMax(1, m_model->columnCount());
+
+    const int extraW = 28;
+    const int extraH = 76;
+    const int gridSpacing = 24;
+    const int outerHMargin = 40;
+    const int outerVMargin = 40;
+
+    int D = m_fixedClockSize;
+
+    if (m_sizingMode == SizingMode::Responsive) {
+        const int panelW = width();
+        const int panelH = height();
+
+        if (panelW > 100 && panelH > 100) {
+            const int totalHSpacing = gridSpacing * (cols - 1);
+            const int totalVSpacing = gridSpacing * (rows - 1);
+
+            const int availCellW = (panelW - outerHMargin - totalHSpacing) / cols;
+            const int availCellH = (panelH - outerVMargin - totalVSpacing) / rows;
+
+            const int maxDFromW = availCellW - extraW;
+            const int maxDFromH = availCellH - extraH;
+            const int maxD = qMin(maxDFromW, maxDFromH);
+
+            D = qBound(90, maxD, 550);
+        } else {
+            D = 190;
+        }
+    }
+
+    const int cardW = D + extraW;
+    const int cardH = D + extraH;
+
+    for (auto *card : m_cardWidgets) {
+        if (card) {
+            card->setClockDiameter(D);
+        }
+    }
+
+    const int gridW = cols * cardW + (cols - 1) * gridSpacing;
+    const int gridH = rows * cardH + (rows - 1) * gridSpacing;
+
+    if (m_gridContainer) {
+        m_gridContainer->setFixedSize(gridW, gridH);
+    }
+    updateAlignment();
+}
+
+void ClockGridPanel::resizeEvent(QResizeEvent *event) {
+    QWidget::resizeEvent(event);
+    if (m_sizingMode == SizingMode::Responsive) {
+        updateCardSizes();
+    }
+}
+
+QSize ClockGridPanel::sizeHint() const {
+    if (!m_model || m_model->count() == 0) {
+        return {400, 300};
+    }
+    const int rows = qMax(1, m_model->rowCount());
+    const int cols = qMax(1, m_model->columnCount());
+    const int baseD = (m_sizingMode == SizingMode::Fixed) ? m_fixedClockSize : 190;
+    const int gridW = cols * (baseD + 28) + (cols - 1) * 24 + 40;
+    const int gridH = rows * (baseD + 76) + (rows - 1) * 24 + 40;
+    return {gridW, gridH};
+}
+
+QSize ClockGridPanel::minimumSizeHint() const {
+    if (m_sizingMode == SizingMode::Fixed) {
+        return sizeHint();
+    }
+    return {220, 250};
 }
 
 void ClockGridPanel::setupUi() {
@@ -65,13 +183,13 @@ void ClockGridPanel::setupUi() {
 
     m_outerLayout->addWidget(m_gridContainer);
 
-    updateAlignmentSpacers();
+    updateAlignment();
     refreshLayout();
 }
 
-void ClockGridPanel::updateAlignmentSpacers() {
-    if (m_outerLayout) {
-        m_outerLayout->setAlignment(m_alignment);
+void ClockGridPanel::updateAlignment() {
+    if (m_outerLayout && m_gridContainer) {
+        m_outerLayout->setAlignment(m_gridContainer, m_alignment | Qt::AlignVCenter);
     }
     if (m_gridLayout) {
         m_gridLayout->setAlignment(m_alignment);
@@ -82,10 +200,9 @@ ClockCardWidget *ClockGridPanel::createCardWidget(const ClockItem &item) {
     auto *card = new ClockCardWidget(item.id, item.timeZone, item.caption, m_gridContainer);
     card->setGridRow(item.row);
     card->setGridCol(item.col);
-    card->setMinimumSize(170, 220);
-    card->setMaximumSize(320, 380);
     card->setEditMode(m_editMode);
     card->setCanRemove(m_model ? m_model->canRemove() : false);
+    applySizingToCard(card);
 
     // Connect edit overlay buttons
     connect(card, &ClockCardWidget::requestAdd, this, &ClockGridPanel::requestAddClock);
@@ -158,6 +275,7 @@ void ClockGridPanel::refreshLayout() {
             card->setGridCol(item.col);
             card->setEditMode(m_editMode);
             card->setCanRemove(canRemoveClocks);
+            applySizingToCard(card);
         }
 
         m_gridLayout->addWidget(card, item.row, item.col);
@@ -180,6 +298,7 @@ void ClockGridPanel::refreshLayout() {
         }
     }
 
+    updateCardSizes();
     emit clockCountChanged(m_model->count());
 }
 

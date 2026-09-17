@@ -7,11 +7,15 @@
 
 class QGridLayout;
 class QHBoxLayout;
-class QSpacerItem;
 
 namespace qworldclock {
 
 class ClockCardWidget;
+
+enum class SizingMode {
+    Responsive,
+    Fixed
+};
 
 class ClockGridPanel : public QWidget {
     Q_OBJECT
@@ -28,12 +32,23 @@ public:
     void setEditMode(bool editMode);
     [[nodiscard]] bool isEditMode() const;
 
+    void setSizingMode(SizingMode mode);
+    [[nodiscard]] SizingMode sizingMode() const;
+
+    void setFixedClockSize(int size);
+    [[nodiscard]] int fixedClockSize() const;
+
     // Helper methods for adding / removing clocks
     bool addClockRelative(const QString &refId, Direction direction, const QTimeZone &timeZone, const QString &caption);
     bool removeClock(const QString &id);
 
     // Direct access to card widget by ID
     [[nodiscard]] ClockCardWidget *cardWidget(const QString &id) const;
+
+    void updateCardSizes();
+
+    [[nodiscard]] QSize sizeHint() const override;
+    [[nodiscard]] QSize minimumSizeHint() const override;
 
 signals:
     void clockCountChanged(int newCount);
@@ -42,10 +57,14 @@ signals:
 public slots:
     void refreshLayout();
 
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+
 private:
     void setupUi();
     ClockCardWidget *createCardWidget(const ClockItem &item);
-    void updateAlignmentSpacers();
+    void updateAlignment();
+    void applySizingToCard(ClockCardWidget *card);
 
     GridModel *m_model{nullptr};
     QMap<QString, ClockCardWidget *> m_cardWidgets;
@@ -55,6 +74,8 @@ private:
     QGridLayout *m_gridLayout{nullptr};
 
     Qt::Alignment m_alignment{Qt::AlignCenter};
+    SizingMode m_sizingMode{SizingMode::Responsive};
+    int m_fixedClockSize{190};
     bool m_editMode{false};
 };
 

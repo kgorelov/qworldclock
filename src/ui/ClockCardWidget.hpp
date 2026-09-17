@@ -55,6 +55,14 @@ public:
 
     void setDropHighlighted(bool highlighted);
 
+    void setClockDiameter(int diameter);
+    [[nodiscard]] int clockDiameter() const;
+    void setResponsive();
+    void setFixedClockSize(int clockDiameter);
+
+    [[nodiscard]] QSize sizeHint() const override;
+    [[nodiscard]] QSize minimumSizeHint() const override;
+
 signals:
     void requestAdd(const QString &refId, Direction direction);
     void requestRemove(const QString &clockId);
@@ -96,6 +104,7 @@ private:
     bool m_canRemove{false};
     bool m_dropHighlighted{false};
     QPoint m_dragStartPos;
+    int m_clockDiameter{190};
 };
 
 } // namespace qworldclock

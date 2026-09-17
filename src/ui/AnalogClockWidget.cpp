@@ -69,14 +69,6 @@ QSize AnalogClockWidget::minimumSizeHint() const {
     return {80, 80};
 }
 
-bool AnalogClockWidget::hasHeightForWidth() const {
-    return true;
-}
-
-int AnalogClockWidget::heightForWidth(int w) const {
-    return w;
-}
-
 void AnalogClockWidget::paintEvent(QPaintEvent * /*event*/) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);

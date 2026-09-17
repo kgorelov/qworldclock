@@ -351,16 +351,18 @@ flowchart LR
 - Provide real-time `QLineEdit` filter for instant lookup.
 - Include custom caption field defaulting to the selected city name.
 
-### Phase 6: Sizing Modes, Alignment & Adaptive Window Layout
-- Implement **Responsive Mode**:
+### Phase 6: Sizing Modes, Alignment & Adaptive Window Layout (Completed)
+- [x] Implement **Responsive Mode**:
   - Clocks scale uniformly with window resize, maintaining 1:1 dial aspect ratio.
-- Implement **Fixed-Size Mode**:
+  - Dynamically calculates optimal card size clamped to viewport dimensions to eliminate clipping.
+- [x] Implement **Fixed-Size Mode**:
   - Embed `ClockGridPanel` in `QScrollArea`.
-  - Add size selector in menu (`Small`, `Medium`, `Large`, or slider).
-- Implement **Clocks Alignment** (Left, Center, Right):
-  - Add mutually exclusive alignment actions to View menu and Right-Click Context Menu.
-  - Implement dynamic margin/spacer management in `ClockGridPanel` to justify clocks left, center, or right.
-- Verify adaptive typography transitions smoothly between minimum and maximum bounds without clipping.
+  - Add size presets in menu (`Small (140px)`, `Medium (190px)`, `Large (250px)`, `Extra Large (320px)`, `Custom...`).
+- [x] Implement **Clocks Alignment** (Left, Center, Right):
+  - Add mutually exclusive alignment actions to View menu and Right-Click Context Menu (`Ctrl+Shift+L/C/R`).
+  - Implement dynamic container layout alignment in `ClockGridPanel` to justify clocks left, center, or right.
+- [x] Verify adaptive typography transitions smoothly without clipping.
+- [x] Verified via `WindowTest` test suite and visual headless grab.
 
 ### Phase 7: Configuration Persistence (TOML)
 - Implement `ConfigManager` reading and writing `~/.config/qworldclock/qworldclock.cfg`.

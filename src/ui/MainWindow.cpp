@@ -11,6 +11,7 @@
 #include <QContextMenuEvent>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
@@ -164,18 +165,49 @@ void MainWindow::setupMenus() {
     m_sizingGroup = new QActionGroup(this);
     m_sizingGroup->setExclusive(true);
 
-    auto *responsiveMode = sizingMenu->addAction(tr("&Responsive (Auto-Scale)"));
-    responsiveMode->setCheckable(true);
-    responsiveMode->setChecked(true);
-    responsiveMode->setData(QStringLiteral("responsive"));
-    m_sizingGroup->addAction(responsiveMode);
+    m_responsiveModeAction = sizingMenu->addAction(tr("&Responsive (Auto-Scale)"));
+    m_responsiveModeAction->setCheckable(true);
+    m_responsiveModeAction->setChecked(true);
+    m_responsiveModeAction->setData(QStringLiteral("responsive"));
+    m_sizingGroup->addAction(m_responsiveModeAction);
 
-    auto *fixedMode = sizingMenu->addAction(tr("&Fixed Size"));
-    fixedMode->setCheckable(true);
-    fixedMode->setData(QStringLiteral("fixed"));
-    m_sizingGroup->addAction(fixedMode);
+    m_fixedModeAction = sizingMenu->addAction(tr("&Fixed Size"));
+    m_fixedModeAction->setCheckable(true);
+    m_fixedModeAction->setData(QStringLiteral("fixed"));
+    m_sizingGroup->addAction(m_fixedModeAction);
 
     connect(m_sizingGroup, &QActionGroup::triggered, this, &MainWindow::onSizingModeChanged);
+
+    // Clock Size Submenu (for Fixed Size Mode)
+    m_clockSizeMenu = viewMenu->addMenu(tr("Clock &Size"));
+    m_clockSizeGroup = new QActionGroup(this);
+    m_clockSizeGroup->setExclusive(true);
+
+    auto *sizeSmall = m_clockSizeMenu->addAction(tr("&Small (140 px)"));
+    sizeSmall->setCheckable(true);
+    sizeSmall->setData(140);
+    m_clockSizeGroup->addAction(sizeSmall);
+
+    auto *sizeMedium = m_clockSizeMenu->addAction(tr("&Medium (190 px)"));
+    sizeMedium->setCheckable(true);
+    sizeMedium->setChecked(true);
+    sizeMedium->setData(190);
+    m_clockSizeGroup->addAction(sizeMedium);
+
+    auto *sizeLarge = m_clockSizeMenu->addAction(tr("&Large (250 px)"));
+    sizeLarge->setCheckable(true);
+    sizeLarge->setData(250);
+    m_clockSizeGroup->addAction(sizeLarge);
+
+    auto *sizeXLarge = m_clockSizeMenu->addAction(tr("&Extra Large (320 px)"));
+    sizeXLarge->setCheckable(true);
+    sizeXLarge->setData(320);
+    m_clockSizeGroup->addAction(sizeXLarge);
+
+    connect(m_clockSizeGroup, &QActionGroup::triggered, this, &MainWindow::onClockSizeChanged);
+
+    m_clockSizeMenu->addSeparator();
+    m_clockSizeMenu->addAction(tr("&Custom Size..."), this, &MainWindow::onCustomClockSize);
 
     viewMenu->addSeparator();
 
@@ -226,6 +258,13 @@ void MainWindow::contextMenuEvent(QContextMenuEvent *event) {
         sizingMenu->addAction(action);
     }
 
+    auto *sizeMenu = contextMenu.addMenu(tr("Clock Size"));
+    for (auto *action : m_clockSizeGroup->actions()) {
+        sizeMenu->addAction(action);
+    }
+    sizeMenu->addSeparator();
+    sizeMenu->addAction(tr("Custom Size..."), this, &MainWindow::onCustomClockSize);
+
     contextMenu.addSeparator();
     contextMenu.addAction(m_toggleSecondsAction);
     contextMenu.addAction(m_toggleDayNightAction);
@@ -275,12 +314,63 @@ void MainWindow::onAlignmentChanged(QAction *action) {
 }
 
 void MainWindow::onSizingModeChanged(QAction *action) {
-    if (!action) {
+    if (!action || !m_gridPanel) {
         return;
     }
     const QString mode = action->data().toString();
+    if (mode == QStringLiteral("fixed")) {
+        m_gridPanel->setSizingMode(SizingMode::Fixed);
+        if (m_statusLabel) {
+            m_statusLabel->setText(tr("Sizing mode: Fixed (%1 px)").arg(m_gridPanel->fixedClockSize()));
+        }
+    } else {
+        m_gridPanel->setSizingMode(SizingMode::Responsive);
+        if (m_statusLabel) {
+            m_statusLabel->setText(tr("Sizing mode: Responsive (Auto-Scale)"));
+        }
+    }
+}
+
+void MainWindow::onClockSizeChanged(QAction *action) {
+    if (!action || !m_gridPanel) {
+        return;
+    }
+    const int size = action->data().toInt();
+    m_gridPanel->setFixedClockSize(size);
+    if (m_fixedModeAction) {
+        m_fixedModeAction->setChecked(true);
+    }
+    m_gridPanel->setSizingMode(SizingMode::Fixed);
     if (m_statusLabel) {
-        m_statusLabel->setText(tr("Sizing mode set to: %1").arg(mode));
+        m_statusLabel->setText(tr("Clock size set to %1 px (Fixed Mode)").arg(size));
+    }
+}
+
+void MainWindow::onCustomClockSize() {
+    if (!m_gridPanel) {
+        return;
+    }
+    bool ok = false;
+    const int currentSize = m_gridPanel->fixedClockSize();
+    const int size = QInputDialog::getInt(
+        this,
+        tr("Custom Clock Size"),
+        tr("Clock diameter in pixels (100 - 500):"),
+        currentSize,
+        100,
+        500,
+        10,
+        &ok);
+
+    if (ok) {
+        m_gridPanel->setFixedClockSize(size);
+        if (m_fixedModeAction) {
+            m_fixedModeAction->setChecked(true);
+        }
+        m_gridPanel->setSizingMode(SizingMode::Fixed);
+        if (m_statusLabel) {
+            m_statusLabel->setText(tr("Clock size set to %1 px (Fixed Mode)").arg(size));
+        }
     }
 }
 

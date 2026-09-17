@@ -47,7 +47,7 @@ void ClockCardWidget::setupUi() {
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(14, 14, 14, 10);
-    layout->setSpacing(6);
+    layout->setSpacing(4);
 
     m_analogClock = new AnalogClockWidget(this);
     layout->addWidget(m_analogClock, 1);
@@ -293,6 +293,34 @@ void ClockCardWidget::setTime(const QDateTime &utcNow) {
     if (m_captionLabel) {
         m_captionLabel->setTime(utcNow);
     }
+}
+
+void ClockCardWidget::setClockDiameter(int diameter) {
+    m_clockDiameter = diameter;
+    const int w = diameter + 28;
+    const int h = diameter + 76;
+    setFixedSize(w, h);
+    updateGeometry();
+}
+
+int ClockCardWidget::clockDiameter() const {
+    return m_clockDiameter;
+}
+
+QSize ClockCardWidget::sizeHint() const {
+    return {m_clockDiameter + 28, m_clockDiameter + 76};
+}
+
+QSize ClockCardWidget::minimumSizeHint() const {
+    return {90 + 28, 90 + 76};
+}
+
+void ClockCardWidget::setResponsive() {
+    setClockDiameter(m_clockDiameter);
+}
+
+void ClockCardWidget::setFixedClockSize(int clockDiameter) {
+    setClockDiameter(clockDiameter);
 }
 
 void ClockCardWidget::resizeEvent(QResizeEvent *event) {

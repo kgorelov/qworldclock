@@ -29,8 +29,6 @@ public:
 
     [[nodiscard]] QSize sizeHint() const override;
     [[nodiscard]] QSize minimumSizeHint() const override;
-    [[nodiscard]] bool hasHeightForWidth() const override;
-    [[nodiscard]] int heightForWidth(int w) const override;
 
 protected:
     void paintEvent(QPaintEvent *event) override;
