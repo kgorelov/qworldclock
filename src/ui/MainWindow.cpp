@@ -1,15 +1,19 @@
 #include "ui/MainWindow.hpp"
+#include "core/TimeEngine.hpp"
+#include "ui/AnalogClockWidget.hpp"
+#include "ui/ClockCardWidget.hpp"
 
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QBoxLayout>
 #include <QContextMenuEvent>
+#include <QHBoxLayout>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
 #include <QStatusBar>
-#include <QVBoxLayout>
 
 namespace qworldclock {
 
@@ -25,20 +29,25 @@ void MainWindow::setupUi() {
     setupMenus();
     setupStatusBar();
 
-    // Central placeholder widget for Phase 1
+    // Start central time engine
+    TimeEngine::instance().start();
+
+    // Central layout with dynamic alignment
     auto *centralWidget = new QWidget(this);
-    auto *layout = new QVBoxLayout(centralWidget);
-    layout->setAlignment(Qt::AlignCenter);
+    m_centralContainerLayout = new QHBoxLayout(centralWidget);
+    m_centralContainerLayout->setContentsMargins(24, 24, 24, 24);
+    m_centralContainerLayout->setAlignment(Qt::AlignCenter);
 
-    auto *welcomeLabel = new QLabel(
-        QStringLiteral("<h2>QWorldClock</h2>"
-                       "<p>World Clock application initialized successfully.</p>"
-                       "<p><i>Clean interface: right-click anywhere for menu.</i></p>"
-                       "<p><small>Shortcuts: <b>Ctrl+M</b> toggle menu | <b>Ctrl+E</b> edit layout</small></p>"),
+    // Initial clock widget showing local time (as per specification)
+    m_primaryClock = new ClockCardWidget(
+        QStringLiteral("clock-local"),
+        QTimeZone::systemTimeZone(),
+        tr("Local Time"),
         centralWidget);
-    welcomeLabel->setAlignment(Qt::AlignCenter);
-    layout->addWidget(welcomeLabel);
+    m_primaryClock->setMinimumSize(180, 230);
+    m_primaryClock->setMaximumSize(380, 460);
 
+    m_centralContainerLayout->addWidget(m_primaryClock);
     setCentralWidget(centralWidget);
 }
 
@@ -110,6 +119,17 @@ void MainWindow::setupMenus() {
 
     viewMenu->addSeparator();
 
+    // Seconds and Day/Night Toggles
+    m_toggleSecondsAction = viewMenu->addAction(tr("Show &Seconds Hand"), this, &MainWindow::onToggleSeconds);
+    m_toggleSecondsAction->setCheckable(true);
+    m_toggleSecondsAction->setChecked(true);
+
+    m_toggleDayNightAction = viewMenu->addAction(tr("Show &Day/Night Shading"), this, &MainWindow::onToggleDayNight);
+    m_toggleDayNightAction->setCheckable(true);
+    m_toggleDayNightAction->setChecked(true);
+
+    viewMenu->addSeparator();
+
     // Toggle Menu Bar Action
     m_toggleMenuBarAction = viewMenu->addAction(tr("Show &Menu Bar"), this, &MainWindow::onToggleMenuBar);
     m_toggleMenuBarAction->setCheckable(true);
@@ -147,6 +167,10 @@ void MainWindow::contextMenuEvent(QContextMenuEvent *event) {
     }
 
     contextMenu.addSeparator();
+    contextMenu.addAction(m_toggleSecondsAction);
+    contextMenu.addAction(m_toggleDayNightAction);
+
+    contextMenu.addSeparator();
     contextMenu.addAction(m_toggleMenuBarAction);
     contextMenu.addAction(m_toggleStatusBarAction);
     contextMenu.addSeparator();
@@ -166,8 +190,24 @@ void MainWindow::onAlignmentChanged(QAction *action) {
         return;
     }
     const QString alignment = action->data().toString();
+    Qt::Alignment alignFlag = Qt::AlignCenter;
+    if (alignment == QStringLiteral("left")) {
+        alignFlag = Qt::AlignLeft | Qt::AlignVCenter;
+    } else if (alignment == QStringLiteral("right")) {
+        alignFlag = Qt::AlignRight | Qt::AlignVCenter;
+    } else {
+        alignFlag = Qt::AlignCenter;
+    }
+    updateLayoutAlignment(alignFlag);
+
     if (m_statusLabel) {
         m_statusLabel->setText(tr("Alignment set to: %1").arg(alignment));
+    }
+}
+
+void MainWindow::updateLayoutAlignment(Qt::Alignment alignment) {
+    if (m_centralContainerLayout) {
+        m_centralContainerLayout->setAlignment(alignment);
     }
 }
 
@@ -192,6 +232,18 @@ void MainWindow::onToggleMenuBar(bool checked) {
 void MainWindow::onToggleStatusBar(bool checked) {
     statusBar()->setVisible(checked);
     m_toggleStatusBarAction->setChecked(checked);
+}
+
+void MainWindow::onToggleSeconds(bool checked) {
+    if (m_primaryClock && m_primaryClock->analogClock()) {
+        m_primaryClock->analogClock()->setShowSeconds(checked);
+    }
+}
+
+void MainWindow::onToggleDayNight(bool checked) {
+    if (m_primaryClock && m_primaryClock->analogClock()) {
+        m_primaryClock->analogClock()->setShowDayNightShading(checked);
+    }
 }
 
 } // namespace qworldclock

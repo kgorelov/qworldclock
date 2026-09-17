@@ -33,19 +33,17 @@ endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-# Core library (for testability and clean separation)
-set(CORE_SOURCES)
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/core/ConfigManager.cpp)
-    list(APPEND CORE_SOURCES
-        src/core/ConfigManager.cpp
-        src/core/GridModel.cpp
-        src/core/TimeEngine.cpp
-    )
-endif()
+# Core sources
+set(CORE_SOURCES
+    src/core/TimeEngine.cpp
+)
 
 # UI sources
 set(UI_SOURCES
     src/ui/MainWindow.cpp
+    src/ui/AnalogClockWidget.cpp
+    src/ui/CaptionLabel.cpp
+    src/ui/ClockCardWidget.cpp
 )
 
 # Main executable
