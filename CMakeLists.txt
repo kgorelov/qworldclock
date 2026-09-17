@@ -36,6 +36,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 # Core sources
 set(CORE_SOURCES
     src/core/TimeEngine.cpp
+    src/core/GridModel.cpp
 )
 
 # UI sources
@@ -44,6 +45,7 @@ set(UI_SOURCES
     src/ui/AnalogClockWidget.cpp
     src/ui/CaptionLabel.cpp
     src/ui/ClockCardWidget.cpp
+    src/ui/ClockGridPanel.cpp
 )
 
 # Main executable

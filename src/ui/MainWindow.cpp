@@ -2,17 +2,18 @@
 #include "core/TimeEngine.hpp"
 #include "ui/AnalogClockWidget.hpp"
 #include "ui/ClockCardWidget.hpp"
+#include "ui/ClockGridPanel.hpp"
 
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
-#include <QBoxLayout>
 #include <QContextMenuEvent>
-#include <QHBoxLayout>
+#include <QInputDialog>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
+#include <QScrollArea>
 #include <QStatusBar>
 
 namespace qworldclock {
@@ -24,7 +25,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 void MainWindow::setupUi() {
     setWindowTitle(QStringLiteral("QWorldClock"));
-    resize(800, 600);
+    resize(900, 650);
 
     setupMenus();
     setupStatusBar();
@@ -32,23 +33,32 @@ void MainWindow::setupUi() {
     // Start central time engine
     TimeEngine::instance().start();
 
-    // Central layout with dynamic alignment
-    auto *centralWidget = new QWidget(this);
-    m_centralContainerLayout = new QHBoxLayout(centralWidget);
-    m_centralContainerLayout->setContentsMargins(24, 24, 24, 24);
-    m_centralContainerLayout->setAlignment(Qt::AlignCenter);
-
-    // Initial clock widget showing local time (as per specification)
-    m_primaryClock = new ClockCardWidget(
+    // Initialize 2D Grid Model with user's local clock
+    m_gridModel = new GridModel(this);
+    m_gridModel->addClock({
         QStringLiteral("clock-local"),
         QTimeZone::systemTimeZone(),
         tr("Local Time"),
-        centralWidget);
-    m_primaryClock->setMinimumSize(180, 230);
-    m_primaryClock->setMaximumSize(380, 460);
+        0,
+        0
+    });
 
-    m_centralContainerLayout->addWidget(m_primaryClock);
-    setCentralWidget(centralWidget);
+    // Initialize Clock Grid Panel
+    m_gridPanel = new ClockGridPanel(m_gridModel, this);
+    connect(m_gridPanel, &ClockGridPanel::clockCountChanged, this, [this](int count) {
+        if (m_statusLabel) {
+            m_statusLabel->setText(tr("%n clock(s) active", "", count));
+        }
+    });
+    connect(m_gridPanel, &ClockGridPanel::requestAddClock, this, &MainWindow::onAddClockRequested);
+
+    // Host grid inside a scroll area
+    auto *scrollArea = new QScrollArea(this);
+    scrollArea->setWidget(m_gridPanel);
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
+
+    setCentralWidget(scrollArea);
 }
 
 void MainWindow::setupMenus() {
@@ -146,7 +156,7 @@ void MainWindow::setupMenus() {
 
 void MainWindow::setupStatusBar() {
     auto *statusBar = this->statusBar();
-    m_statusLabel = new QLabel(tr("Ready"), this);
+    m_statusLabel = new QLabel(tr("1 clock active"), this);
     statusBar->addWidget(m_statusLabel);
 }
 
@@ -180,8 +190,11 @@ void MainWindow::contextMenuEvent(QContextMenuEvent *event) {
 }
 
 void MainWindow::onToggleEditMode(bool checked) {
+    if (m_gridPanel) {
+        m_gridPanel->setEditMode(checked);
+    }
     if (m_statusLabel) {
-        m_statusLabel->setText(checked ? tr("Edit Mode: Active") : tr("Ready"));
+        m_statusLabel->setText(checked ? tr("Edit Mode: Active (Right-click clocks to add/remove)") : tr("%n clock(s) active", "", m_gridModel ? m_gridModel->count() : 1));
     }
 }
 
@@ -192,22 +205,19 @@ void MainWindow::onAlignmentChanged(QAction *action) {
     const QString alignment = action->data().toString();
     Qt::Alignment alignFlag = Qt::AlignCenter;
     if (alignment == QStringLiteral("left")) {
-        alignFlag = Qt::AlignLeft | Qt::AlignVCenter;
+        alignFlag = Qt::AlignLeft;
     } else if (alignment == QStringLiteral("right")) {
-        alignFlag = Qt::AlignRight | Qt::AlignVCenter;
+        alignFlag = Qt::AlignRight;
     } else {
         alignFlag = Qt::AlignCenter;
     }
-    updateLayoutAlignment(alignFlag);
+
+    if (m_gridPanel) {
+        m_gridPanel->setGridAlignment(alignFlag);
+    }
 
     if (m_statusLabel) {
         m_statusLabel->setText(tr("Alignment set to: %1").arg(alignment));
-    }
-}
-
-void MainWindow::updateLayoutAlignment(Qt::Alignment alignment) {
-    if (m_centralContainerLayout) {
-        m_centralContainerLayout->setAlignment(alignment);
     }
 }
 
@@ -235,15 +245,102 @@ void MainWindow::onToggleStatusBar(bool checked) {
 }
 
 void MainWindow::onToggleSeconds(bool checked) {
-    if (m_primaryClock && m_primaryClock->analogClock()) {
-        m_primaryClock->analogClock()->setShowSeconds(checked);
+    m_showSeconds = checked;
+    if (m_gridModel && m_gridPanel) {
+        for (const auto &item : m_gridModel->clocks()) {
+            auto *card = m_gridPanel->cardWidget(item.id);
+            if (card && card->analogClock()) {
+                card->analogClock()->setShowSeconds(checked);
+            }
+        }
     }
 }
 
 void MainWindow::onToggleDayNight(bool checked) {
-    if (m_primaryClock && m_primaryClock->analogClock()) {
-        m_primaryClock->analogClock()->setShowDayNightShading(checked);
+    m_showDayNight = checked;
+    if (m_gridModel && m_gridPanel) {
+        for (const auto &item : m_gridModel->clocks()) {
+            auto *card = m_gridPanel->cardWidget(item.id);
+            if (card && card->analogClock()) {
+                card->analogClock()->setShowDayNightShading(checked);
+            }
+        }
     }
+}
+
+void MainWindow::onAddClockRequested(const QString &refId, Direction direction) {
+    const QStringList presets = {
+        QStringLiteral("London (Europe/London)"),
+        QStringLiteral("New York (America/New_York)"),
+        QStringLiteral("San Francisco (America/Los_Angeles)"),
+        QStringLiteral("Tokyo (Asia/Tokyo)"),
+        QStringLiteral("Geneva (Europe/Zurich)"),
+        QStringLiteral("Sydney (Australia/Sydney)"),
+        QStringLiteral("UTC (UTC)"),
+        QStringLiteral("Custom...")
+    };
+
+    bool ok = false;
+    const QString selected = QInputDialog::getItem(
+        this,
+        tr("Add Clock"),
+        tr("Select Time Zone for new clock:"),
+        presets,
+        0,
+        false,
+        &ok);
+
+    if (!ok || selected.isEmpty()) {
+        return;
+    }
+
+    QByteArray tzId = "UTC";
+    QString caption = QStringLiteral("World Clock");
+
+    if (selected.contains(QStringLiteral("London"))) {
+        tzId = "Europe/London";
+        caption = QStringLiteral("London");
+    } else if (selected.contains(QStringLiteral("New York"))) {
+        tzId = "America/New_York";
+        caption = QStringLiteral("New York");
+    } else if (selected.contains(QStringLiteral("San Francisco"))) {
+        tzId = "America/Los_Angeles";
+        caption = QStringLiteral("San Francisco");
+    } else if (selected.contains(QStringLiteral("Tokyo"))) {
+        tzId = "Asia/Tokyo";
+        caption = QStringLiteral("Tokyo");
+    } else if (selected.contains(QStringLiteral("Geneva"))) {
+        tzId = "Europe/Zurich";
+        caption = QStringLiteral("Geneva");
+    } else if (selected.contains(QStringLiteral("Sydney"))) {
+        tzId = "Australia/Sydney";
+        caption = QStringLiteral("Sydney");
+    } else if (selected.contains(QStringLiteral("UTC"))) {
+        tzId = "UTC";
+        caption = QStringLiteral("UTC");
+    } else {
+        bool customOk = false;
+        const QString customTz = QInputDialog::getText(
+            this,
+            tr("Custom Timezone"),
+            tr("Enter IANA Timezone (e.g. Europe/Paris):"),
+            QLineEdit::Normal,
+            QStringLiteral("Europe/Paris"),
+            &customOk);
+        if (customOk && !customTz.isEmpty()) {
+            tzId = customTz.toUtf8();
+            caption = customTz.section('/', -1).replace('_', ' ');
+        } else {
+            return;
+        }
+    }
+
+    QTimeZone tz(tzId);
+    if (!tz.isValid()) {
+        tz = QTimeZone::utc();
+    }
+
+    m_gridPanel->addClockRelative(refId, direction, tz, caption);
 }
 
 } // namespace qworldclock
