@@ -46,6 +46,7 @@ set(UI_SOURCES
     src/ui/CaptionLabel.cpp
     src/ui/ClockCardWidget.cpp
     src/ui/ClockGridPanel.cpp
+    src/ui/TimeZoneDialog.cpp
 )
 
 # Main executable

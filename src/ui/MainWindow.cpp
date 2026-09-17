@@ -3,6 +3,7 @@
 #include "ui/AnalogClockWidget.hpp"
 #include "ui/ClockCardWidget.hpp"
 #include "ui/ClockGridPanel.hpp"
+#include "ui/TimeZoneDialog.hpp"
 
 #include <QAction>
 #include <QActionGroup>
@@ -10,7 +11,6 @@
 #include <QContextMenuEvent>
 #include <QFrame>
 #include <QHBoxLayout>
-#include <QInputDialog>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
@@ -322,78 +322,12 @@ void MainWindow::onToggleDayNight(bool checked) {
 }
 
 void MainWindow::onAddClockRequested(const QString &refId, Direction direction) {
-    const QStringList presets = {
-        QStringLiteral("London (Europe/London)"),
-        QStringLiteral("New York (America/New_York)"),
-        QStringLiteral("San Francisco (America/Los_Angeles)"),
-        QStringLiteral("Tokyo (Asia/Tokyo)"),
-        QStringLiteral("Geneva (Europe/Zurich)"),
-        QStringLiteral("Sydney (Australia/Sydney)"),
-        QStringLiteral("UTC (UTC)"),
-        QStringLiteral("Custom...")
-    };
-
-    bool ok = false;
-    const QString selected = QInputDialog::getItem(
-        this,
-        tr("Add Clock"),
-        tr("Select Time Zone for new clock:"),
-        presets,
-        0,
-        false,
-        &ok);
-
-    if (!ok || selected.isEmpty()) {
-        return;
+    TimeZoneDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted) {
+        const QTimeZone tz = dialog.selectedTimeZone();
+        const QString caption = dialog.selectedCaption();
+        m_gridPanel->addClockRelative(refId, direction, tz, caption);
     }
-
-    QByteArray tzId = "UTC";
-    QString caption = QStringLiteral("World Clock");
-
-    if (selected.contains(QStringLiteral("London"))) {
-        tzId = "Europe/London";
-        caption = QStringLiteral("London");
-    } else if (selected.contains(QStringLiteral("New York"))) {
-        tzId = "America/New_York";
-        caption = QStringLiteral("New York");
-    } else if (selected.contains(QStringLiteral("San Francisco"))) {
-        tzId = "America/Los_Angeles";
-        caption = QStringLiteral("San Francisco");
-    } else if (selected.contains(QStringLiteral("Tokyo"))) {
-        tzId = "Asia/Tokyo";
-        caption = QStringLiteral("Tokyo");
-    } else if (selected.contains(QStringLiteral("Geneva"))) {
-        tzId = "Europe/Zurich";
-        caption = QStringLiteral("Geneva");
-    } else if (selected.contains(QStringLiteral("Sydney"))) {
-        tzId = "Australia/Sydney";
-        caption = QStringLiteral("Sydney");
-    } else if (selected.contains(QStringLiteral("UTC"))) {
-        tzId = "UTC";
-        caption = QStringLiteral("UTC");
-    } else {
-        bool customOk = false;
-        const QString customTz = QInputDialog::getText(
-            this,
-            tr("Custom Timezone"),
-            tr("Enter IANA Timezone (e.g. Europe/Paris):"),
-            QLineEdit::Normal,
-            QStringLiteral("Europe/Paris"),
-            &customOk);
-        if (customOk && !customTz.isEmpty()) {
-            tzId = customTz.toUtf8();
-            caption = customTz.section('/', -1).replace('_', ' ');
-        } else {
-            return;
-        }
-    }
-
-    QTimeZone tz(tzId);
-    if (!tz.isValid()) {
-        tz = QTimeZone::utc();
-    }
-
-    m_gridPanel->addClockRelative(refId, direction, tz, caption);
 }
 
 } // namespace qworldclock
