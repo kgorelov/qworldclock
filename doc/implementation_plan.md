@@ -364,15 +364,17 @@ flowchart LR
 - [x] Verify adaptive typography transitions smoothly without clipping.
 - [x] Verified via `WindowTest` test suite and visual headless grab.
 
-### Phase 7: Configuration Persistence (TOML)
-- Implement `ConfigManager` reading and writing `~/.config/qworldclock/qworldclock.cfg`.
-- Handle default configuration creation on first launch (defaults to 1 local clock).
-- Save and restore:
-  - Window geometry (width, height, position, maximized state).
+### Phase 7: Configuration Persistence (TOML) (Completed)
+- [x] Implemented `ConfigManager` reading and writing `~/.config/qworldclock/qworldclock.cfg` using `tomlplusplus`.
+- [x] Automatic default configuration creation on first launch (defaults to 1 local clock, responsive mode, center alignment).
+- [x] Saves and restores:
+  - Window geometry (`width`, `height`, `x`, `y`, `maximized`).
   - UI visibility states (`show_menu_bar`, `show_status_bar`).
+  - View settings (`show_seconds`, `show_day_night`).
   - Sizing mode, fixed clock dimension, and clocks alignment setting (`left`, `center`, `right`).
   - Ordered list of clocks with IDs, timezone names, custom captions, and `(row, col)` positions.
-- Trigger auto-save on any layout modification, clock addition, deletion, alignment change, or window resize.
+- [x] Auto-save wired to clock addition, removal, reordering, alignment changes, sizing changes, visibility toggles, window close, and application quit.
+- [x] Verified unit tests in `TestConfigManager` and full end-to-end multi-session persistence in `TestWindow`.
 
 ### Phase 8: Testing, Cross-Platform Verification & Refinement
 - **Unit Testing**:

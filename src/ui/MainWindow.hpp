@@ -1,10 +1,12 @@
 #pragma once
 
+#include "core/ConfigManager.hpp"
 #include "core/GridModel.hpp"
 
 #include <QMainWindow>
 #include <QActionGroup>
 
+class QCloseEvent;
 class QFrame;
 class QLabel;
 class QMenu;
@@ -20,10 +22,18 @@ class MainWindow : public QMainWindow {
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(const QString &configFilePath, QWidget *parent = nullptr);
     ~MainWindow() override = default;
+
+    void saveConfig();
+    void loadConfig();
+
+    [[nodiscard]] ConfigManager &configManager();
+    [[nodiscard]] const ConfigManager &configManager() const;
 
 protected:
     void contextMenuEvent(QContextMenuEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
 
 private:
     void setupUi();
@@ -43,6 +53,7 @@ private:
     void onAddClockRequested(const QString &refId, Direction direction);
 
     // Core data & UI components
+    ConfigManager m_configManager;
     GridModel *m_gridModel{nullptr};
     ClockGridPanel *m_gridPanel{nullptr};
     QFrame *m_editBanner{nullptr};
@@ -63,6 +74,7 @@ private:
 
     bool m_showSeconds{true};
     bool m_showDayNight{true};
+    bool m_isLoadingConfig{false};
 };
 
 } // namespace qworldclock

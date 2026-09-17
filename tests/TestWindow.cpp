@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QDir>
+#include <QMenuBar>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QTest>
@@ -14,17 +15,29 @@ class TestWindow : public QObject {
 
 private slots:
     void initTestCase();
+    void cleanupTestCase();
     void testStartupFit();
     void testMultipleClocksResponsive();
     void testAlignments();
+    void testEndToEndPersistence();
+
+private:
+    QString m_testDir;
 };
 
 void TestWindow::initTestCase() {
+    m_testDir = QDir::currentPath() + QStringLiteral("/build/test_scratch_window");
+    QDir().mkpath(m_testDir);
     qApp->processEvents();
 }
 
+void TestWindow::cleanupTestCase() {
+    QDir(m_testDir).removeRecursively();
+}
+
 void TestWindow::testStartupFit() {
-    MainWindow window;
+    const QString cfgPath = m_testDir + QStringLiteral("/startup.cfg");
+    MainWindow window(cfgPath);
     window.resize(900, 650);
     window.show();
     QVERIFY(QTest::qWaitForWindowExposed(&window));
@@ -63,7 +76,8 @@ void TestWindow::testStartupFit() {
 }
 
 void TestWindow::testMultipleClocksResponsive() {
-    MainWindow window;
+    const QString cfgPath = m_testDir + QStringLiteral("/multi.cfg");
+    MainWindow window(cfgPath);
     window.resize(900, 650);
     window.show();
     QVERIFY(QTest::qWaitForWindowExposed(&window));
@@ -87,7 +101,8 @@ void TestWindow::testMultipleClocksResponsive() {
 }
 
 void TestWindow::testAlignments() {
-    MainWindow window;
+    const QString cfgPath = m_testDir + QStringLiteral("/align.cfg");
+    MainWindow window(cfgPath);
     window.resize(900, 650);
     window.show();
     QVERIFY(QTest::qWaitForWindowExposed(&window));
@@ -118,6 +133,69 @@ void TestWindow::testAlignments() {
     const int rightX = card->mapTo(panel, QPoint(0, 0)).x();
     const int expectedRightX = panel->width() - card->width() - 20;
     QVERIFY(qAbs(rightX - expectedRightX) <= 10);
+}
+
+void TestWindow::testEndToEndPersistence() {
+    const QString cfgPath = m_testDir + QStringLiteral("/e2e_persistence.cfg");
+
+    // Session 1: Configure window, clocks, and settings, then close
+    {
+        MainWindow session1(cfgPath);
+        session1.resize(1000, 700);
+        session1.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&session1));
+        qApp->processEvents();
+
+        auto *panel = session1.findChild<ClockGridPanel *>();
+        QVERIFY(panel != nullptr);
+
+        // Set alignment to Right
+        panel->setGridAlignment(Qt::AlignRight);
+
+        // Set Fixed Sizing Mode with 250px clock size
+        panel->setFixedClockSize(250);
+        panel->setSizingMode(SizingMode::Fixed);
+
+        // Add Tokyo clock Below
+        QVERIFY(panel->addClockRelative(QStringLiteral("clock-local"), Direction::Below,
+                                        QTimeZone("Asia/Tokyo"), QStringLiteral("Tokyo HQ")));
+
+        // Hide menu bar
+        session1.menuBar()->setVisible(false);
+
+        session1.close();
+    }
+
+    // Verify config file was written
+    QVERIFY(QFile::exists(cfgPath));
+
+    // Session 2: Restore from saved config and verify exact state
+    {
+        MainWindow session2(cfgPath);
+        session2.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&session2));
+        qApp->processEvents();
+
+        auto *panel = session2.findChild<ClockGridPanel *>();
+        QVERIFY(panel != nullptr);
+
+        // Clocks restored
+        QCOMPARE(panel->model()->count(), 2);
+        auto localCard = panel->cardWidget(QStringLiteral("clock-local"));
+        QVERIFY(localCard != nullptr);
+        QCOMPARE(localCard->gridRow(), 0);
+        QCOMPARE(localCard->gridCol(), 0);
+
+        // Alignment restored
+        QCOMPARE(panel->gridAlignment(), Qt::AlignRight);
+
+        // Sizing mode and size restored
+        QCOMPARE(panel->sizingMode(), SizingMode::Fixed);
+        QCOMPARE(panel->fixedClockSize(), 250);
+
+        // Menu bar visibility restored
+        QCOMPARE(session2.menuBar()->isVisible(), false);
+    }
 }
 
 QTEST_MAIN(TestWindow)

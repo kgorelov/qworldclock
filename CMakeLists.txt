@@ -37,6 +37,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(CORE_SOURCES
     src/core/TimeEngine.cpp
     src/core/GridModel.cpp
+    src/core/ConfigManager.cpp
 )
 
 # UI sources

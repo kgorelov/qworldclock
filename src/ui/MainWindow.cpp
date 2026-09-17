@@ -8,6 +8,7 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QCloseEvent>
 #include <QContextMenuEvent>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -24,8 +25,16 @@
 namespace qworldclock {
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent) {
+    : MainWindow(QString(), parent) {
+}
+
+MainWindow::MainWindow(const QString &configFilePath, QWidget *parent)
+    : QMainWindow(parent)
+    , m_configManager(configFilePath) {
     setupUi();
+    loadConfig();
+
+    connect(qApp, &QCoreApplication::aboutToQuit, this, &MainWindow::saveConfig);
 }
 
 void MainWindow::setupUi() {
@@ -38,15 +47,9 @@ void MainWindow::setupUi() {
     // Start central time engine
     TimeEngine::instance().start();
 
-    // Initialize 2D Grid Model with user's local clock
+    // Initialize 2D Grid Model
     m_gridModel = new GridModel(this);
-    m_gridModel->addClock({
-        QStringLiteral("clock-local"),
-        QTimeZone::systemTimeZone(),
-        tr("Local Time"),
-        0,
-        0
-    });
+    connect(m_gridModel, &GridModel::layoutChanged, this, &MainWindow::saveConfig);
 
     // Initialize Clock Grid Panel
     m_gridPanel = new ClockGridPanel(m_gridModel, this);
@@ -311,6 +314,7 @@ void MainWindow::onAlignmentChanged(QAction *action) {
     if (m_statusLabel) {
         m_statusLabel->setText(tr("Alignment set to: %1").arg(alignment));
     }
+    saveConfig();
 }
 
 void MainWindow::onSizingModeChanged(QAction *action) {
@@ -329,6 +333,7 @@ void MainWindow::onSizingModeChanged(QAction *action) {
             m_statusLabel->setText(tr("Sizing mode: Responsive (Auto-Scale)"));
         }
     }
+    saveConfig();
 }
 
 void MainWindow::onClockSizeChanged(QAction *action) {
@@ -344,6 +349,7 @@ void MainWindow::onClockSizeChanged(QAction *action) {
     if (m_statusLabel) {
         m_statusLabel->setText(tr("Clock size set to %1 px (Fixed Mode)").arg(size));
     }
+    saveConfig();
 }
 
 void MainWindow::onCustomClockSize() {
@@ -371,6 +377,7 @@ void MainWindow::onCustomClockSize() {
         if (m_statusLabel) {
             m_statusLabel->setText(tr("Clock size set to %1 px (Fixed Mode)").arg(size));
         }
+        saveConfig();
     }
 }
 
@@ -380,11 +387,13 @@ void MainWindow::onToggleMenuBar(bool checked) {
     if (m_statusLabel) {
         m_statusLabel->setText(checked ? tr("Menu bar shown") : tr("Menu bar hidden (press Ctrl+M or right-click to restore)"));
     }
+    saveConfig();
 }
 
 void MainWindow::onToggleStatusBar(bool checked) {
     statusBar()->setVisible(checked);
     m_toggleStatusBarAction->setChecked(checked);
+    saveConfig();
 }
 
 void MainWindow::onToggleSeconds(bool checked) {
@@ -397,6 +406,7 @@ void MainWindow::onToggleSeconds(bool checked) {
             }
         }
     }
+    saveConfig();
 }
 
 void MainWindow::onToggleDayNight(bool checked) {
@@ -409,6 +419,7 @@ void MainWindow::onToggleDayNight(bool checked) {
             }
         }
     }
+    saveConfig();
 }
 
 void MainWindow::onAddClockRequested(const QString &refId, Direction direction) {
@@ -418,6 +429,155 @@ void MainWindow::onAddClockRequested(const QString &refId, Direction direction) 
         const QString caption = dialog.selectedCaption();
         m_gridPanel->addClockRelative(refId, direction, tz, caption);
     }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+    saveConfig();
+    QMainWindow::closeEvent(event);
+}
+
+void MainWindow::loadConfig() {
+    m_isLoadingConfig = true;
+
+    const AppConfig cfg = m_configManager.load();
+
+    // 1. Clocks
+    if (m_gridModel) {
+        m_gridModel->blockSignals(true);
+        m_gridModel->clear();
+        if (cfg.clocks.isEmpty()) {
+            m_gridModel->addClock({
+                QStringLiteral("clock-local"),
+                QTimeZone::systemTimeZone(),
+                tr("Local Time"),
+                0,
+                0
+            });
+        } else {
+            for (const auto &item : cfg.clocks) {
+                m_gridModel->addClock(item);
+            }
+        }
+        m_gridModel->blockSignals(false);
+    }
+
+    // 2. Sizing & Alignment on Grid Panel
+    if (m_gridPanel) {
+        m_gridPanel->setFixedClockSize(cfg.fixedClockSize);
+        m_gridPanel->setSizingMode(ConfigManager::stringToSizingMode(cfg.sizingMode));
+        m_gridPanel->setGridAlignment(ConfigManager::stringToAlignment(cfg.alignment));
+        m_gridPanel->refreshLayout();
+    }
+
+    // 3. Update Menu Actions / UI State
+    if (m_alignmentGroup) {
+        for (auto *action : m_alignmentGroup->actions()) {
+            if (action->data().toString() == cfg.alignment) {
+                action->setChecked(true);
+                break;
+            }
+        }
+    }
+
+    if (cfg.sizingMode == QStringLiteral("fixed")) {
+        if (m_fixedModeAction) {
+            m_fixedModeAction->setChecked(true);
+        }
+    } else {
+        if (m_responsiveModeAction) {
+            m_responsiveModeAction->setChecked(true);
+        }
+    }
+
+    if (m_clockSizeGroup) {
+        for (auto *action : m_clockSizeGroup->actions()) {
+            if (action->data().toInt() == cfg.fixedClockSize) {
+                action->setChecked(true);
+                break;
+            }
+        }
+    }
+
+    m_showSeconds = cfg.showSeconds;
+    if (m_toggleSecondsAction) {
+        m_toggleSecondsAction->setChecked(cfg.showSeconds);
+    }
+    onToggleSeconds(cfg.showSeconds);
+
+    m_showDayNight = cfg.showDayNight;
+    if (m_toggleDayNightAction) {
+        m_toggleDayNightAction->setChecked(cfg.showDayNight);
+    }
+    onToggleDayNight(cfg.showDayNight);
+
+    if (m_toggleMenuBarAction) {
+        m_toggleMenuBarAction->setChecked(cfg.showMenuBar);
+    }
+    menuBar()->setVisible(cfg.showMenuBar);
+
+    if (m_toggleStatusBarAction) {
+        m_toggleStatusBarAction->setChecked(cfg.showStatusBar);
+    }
+    statusBar()->setVisible(cfg.showStatusBar);
+
+    // Window Geometry
+    if (cfg.window.width >= 200 && cfg.window.height >= 200) {
+        resize(cfg.window.width, cfg.window.height);
+    }
+    if (cfg.window.x >= 0 && cfg.window.y >= 0) {
+        move(cfg.window.x, cfg.window.y);
+    }
+    if (cfg.window.maximized) {
+        showMaximized();
+    }
+
+    m_isLoadingConfig = false;
+}
+
+void MainWindow::saveConfig() {
+    if (m_isLoadingConfig || !m_gridModel || !m_gridPanel) {
+        return;
+    }
+
+    AppConfig cfg;
+    cfg.version = QStringLiteral("1.0.0");
+    cfg.sizingMode = ConfigManager::sizingModeToString(m_gridPanel->sizingMode());
+    cfg.fixedClockSize = m_gridPanel->fixedClockSize();
+    cfg.alignment = ConfigManager::alignmentToString(m_gridPanel->gridAlignment());
+    cfg.showMenuBar = menuBar()->isVisible();
+    cfg.showStatusBar = statusBar()->isVisible();
+    cfg.showSeconds = m_showSeconds;
+    cfg.showDayNight = m_showDayNight;
+
+    cfg.window.maximized = isMaximized();
+    if (!isMaximized()) {
+        cfg.window.width = width();
+        cfg.window.height = height();
+        cfg.window.x = pos().x();
+        cfg.window.y = pos().y();
+    } else {
+        const QRect norm = normalGeometry();
+        cfg.window.width = norm.width();
+        cfg.window.height = norm.height();
+        cfg.window.x = norm.x();
+        cfg.window.y = norm.y();
+    }
+
+    const auto &clocksVec = m_gridModel->clocks();
+    cfg.clocks.clear();
+    for (const auto &item : clocksVec) {
+        cfg.clocks.append(item);
+    }
+
+    m_configManager.save(cfg);
+}
+
+ConfigManager &MainWindow::configManager() {
+    return m_configManager;
+}
+
+const ConfigManager &MainWindow::configManager() const {
+    return m_configManager;
 }
 
 } // namespace qworldclock
