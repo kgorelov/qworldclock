@@ -35,7 +35,14 @@ Qt::Alignment ClockGridPanel::gridAlignment() const {
 }
 
 void ClockGridPanel::setEditMode(bool editMode) {
-    m_editMode = editMode;
+    if (m_editMode != editMode) {
+        m_editMode = editMode;
+        for (auto *card : m_cardWidgets) {
+            if (card) {
+                card->setEditMode(editMode);
+            }
+        }
+    }
 }
 
 bool ClockGridPanel::isEditMode() const {
@@ -48,13 +55,13 @@ ClockCardWidget *ClockGridPanel::cardWidget(const QString &id) const {
 
 void ClockGridPanel::setupUi() {
     m_outerLayout = new QHBoxLayout(this);
-    m_outerLayout->setContentsMargins(16, 16, 16, 16);
+    m_outerLayout->setContentsMargins(20, 20, 20, 20);
     m_outerLayout->setSpacing(0);
 
     m_gridContainer = new QWidget(this);
     m_gridLayout = new QGridLayout(m_gridContainer);
     m_gridLayout->setContentsMargins(0, 0, 0, 0);
-    m_gridLayout->setSpacing(20);
+    m_gridLayout->setSpacing(24);
 
     m_outerLayout->addWidget(m_gridContainer);
 
@@ -77,8 +84,21 @@ ClockCardWidget *ClockGridPanel::createCardWidget(const ClockItem &item) {
     card->setGridCol(item.col);
     card->setMinimumSize(170, 220);
     card->setMaximumSize(320, 380);
+    card->setEditMode(m_editMode);
+    card->setCanRemove(m_model ? m_model->canRemove() : false);
 
-    // Provide context menu on each card for directional adding and removal
+    // Connect edit overlay buttons
+    connect(card, &ClockCardWidget::requestAdd, this, &ClockGridPanel::requestAddClock);
+    connect(card, &ClockCardWidget::requestRemove, this, [this](const QString &id) {
+        removeClock(id);
+    });
+    connect(card, &ClockCardWidget::clockDropped, this, [this](const QString &srcId, const QString &tgtId) {
+        if (m_model) {
+            m_model->swapClocks(srcId, tgtId);
+        }
+    });
+
+    // Provide right-click context menu on each card as well
     card->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(card, &QWidget::customContextMenuRequested, this, [this, card](const QPoint &pos) {
         QMenu menu(card);
@@ -121,6 +141,7 @@ void ClockGridPanel::refreshLayout() {
 
     const auto &clocks = m_model->clocks();
     QSet<QString> activeIds;
+    const bool canRemoveClocks = m_model->canRemove();
 
     // 1. Position all existing and new cards
     for (const auto &item : clocks) {
@@ -135,6 +156,8 @@ void ClockGridPanel::refreshLayout() {
             card->setCaption(item.caption);
             card->setGridRow(item.row);
             card->setGridCol(item.col);
+            card->setEditMode(m_editMode);
+            card->setCanRemove(canRemoveClocks);
         }
 
         m_gridLayout->addWidget(card, item.row, item.col);
@@ -147,6 +170,13 @@ void ClockGridPanel::refreshLayout() {
             auto *card = m_cardWidgets.take(id);
             m_gridLayout->removeWidget(card);
             card->deleteLater();
+        }
+    }
+
+    // Update canRemove state across remaining cards
+    for (auto *card : m_cardWidgets) {
+        if (card) {
+            card->setCanRemove(canRemoveClocks);
         }
     }
 

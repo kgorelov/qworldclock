@@ -8,13 +8,17 @@
 #include <QActionGroup>
 #include <QApplication>
 #include <QContextMenuEvent>
+#include <QFrame>
+#include <QHBoxLayout>
 #include <QInputDialog>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QStatusBar>
+#include <QVBoxLayout>
 
 namespace qworldclock {
 
@@ -52,13 +56,59 @@ void MainWindow::setupUi() {
     });
     connect(m_gridPanel, &ClockGridPanel::requestAddClock, this, &MainWindow::onAddClockRequested);
 
-    // Host grid inside a scroll area
-    auto *scrollArea = new QScrollArea(this);
+    // Host grid and edit banner inside a vertical main layout
+    auto *mainContainer = new QWidget(this);
+    auto *mainLayout = new QVBoxLayout(mainContainer);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->setSpacing(0);
+
+    // Edit Mode Banner (hidden by default)
+    m_editBanner = new QFrame(mainContainer);
+    m_editBanner->setObjectName(QStringLiteral("EditBanner"));
+    m_editBanner->setStyleSheet(QStringLiteral(
+        "#EditBanner {"
+        "  background-color: #1e293b;"
+        "  border-bottom: 1px solid #334155;"
+        "}"));
+    auto *bannerLayout = new QHBoxLayout(m_editBanner);
+    bannerLayout->setContentsMargins(16, 6, 16, 6);
+
+    auto *bannerText = new QLabel(
+        tr("<b>Edit Mode</b> — Click <b>+</b> to add adjacent clocks, <b>✕</b> to remove, or drag cards to reorder."),
+        m_editBanner);
+    bannerText->setStyleSheet(QStringLiteral("color: #f8fafc; font-size: 13px;"));
+    bannerLayout->addWidget(bannerText);
+    bannerLayout->addStretch(1);
+
+    auto *doneBtn = new QPushButton(tr("Done Editing"), m_editBanner);
+    doneBtn->setStyleSheet(QStringLiteral(
+        "QPushButton {"
+        "  background-color: #3b82f6;"
+        "  color: white;"
+        "  border: none;"
+        "  border-radius: 4px;"
+        "  padding: 5px 14px;"
+        "  font-weight: bold;"
+        "}"
+        "QPushButton:hover { background-color: #2563eb; }"));
+    doneBtn->setCursor(Qt::PointingHandCursor);
+    connect(doneBtn, &QPushButton::clicked, this, [this]() {
+        m_editModeAction->setChecked(false);
+        onToggleEditMode(false);
+    });
+    bannerLayout->addWidget(doneBtn);
+
+    m_editBanner->setVisible(false);
+    mainLayout->addWidget(m_editBanner);
+
+    // Scroll area hosting grid panel
+    auto *scrollArea = new QScrollArea(mainContainer);
     scrollArea->setWidget(m_gridPanel);
     scrollArea->setWidgetResizable(true);
     scrollArea->setFrameShape(QFrame::NoFrame);
+    mainLayout->addWidget(scrollArea, 1);
 
-    setCentralWidget(scrollArea);
+    setCentralWidget(mainContainer);
 }
 
 void MainWindow::setupMenus() {
@@ -190,11 +240,14 @@ void MainWindow::contextMenuEvent(QContextMenuEvent *event) {
 }
 
 void MainWindow::onToggleEditMode(bool checked) {
+    if (m_editBanner) {
+        m_editBanner->setVisible(checked);
+    }
     if (m_gridPanel) {
         m_gridPanel->setEditMode(checked);
     }
     if (m_statusLabel) {
-        m_statusLabel->setText(checked ? tr("Edit Mode: Active (Right-click clocks to add/remove)") : tr("%n clock(s) active", "", m_gridModel ? m_gridModel->count() : 1));
+        m_statusLabel->setText(checked ? tr("Edit Mode: Active") : tr("%n clock(s) active", "", m_gridModel ? m_gridModel->count() : 1));
     }
 }
 

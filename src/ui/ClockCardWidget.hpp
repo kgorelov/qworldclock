@@ -1,7 +1,18 @@
 #pragma once
 
+#include "core/GridModel.hpp"
+
 #include <QFrame>
+#include <QPoint>
 #include <QTimeZone>
+
+class QPushButton;
+class QLabel;
+class QDragEnterEvent;
+class QDragLeaveEvent;
+class QDropEvent;
+class QMouseEvent;
+class QResizeEvent;
 
 namespace qworldclock {
 
@@ -36,11 +47,35 @@ public:
     [[nodiscard]] AnalogClockWidget *analogClock() const;
     [[nodiscard]] CaptionLabel *captionLabel() const;
 
+    void setEditMode(bool editMode);
+    [[nodiscard]] bool isEditMode() const;
+
+    void setCanRemove(bool canRemove);
+    [[nodiscard]] bool canRemove() const;
+
+    void setDropHighlighted(bool highlighted);
+
+signals:
+    void requestAdd(const QString &refId, Direction direction);
+    void requestRemove(const QString &clockId);
+    void clockDropped(const QString &sourceId, const QString &targetId);
+
 public slots:
     void setTime(const QDateTime &utcNow);
 
+protected:
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dragLeaveEvent(QDragLeaveEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
+
 private:
     void setupUi();
+    void setupEditControls();
+    void updateButtonPositions();
+    void updateCardStyle();
 
     QString m_clockId;
     int m_gridRow{0};
@@ -48,6 +83,19 @@ private:
 
     AnalogClockWidget *m_analogClock{nullptr};
     CaptionLabel *m_captionLabel{nullptr};
+
+    // Edit controls
+    QPushButton *m_btnAddTop{nullptr};
+    QPushButton *m_btnAddBottom{nullptr};
+    QPushButton *m_btnAddLeft{nullptr};
+    QPushButton *m_btnAddRight{nullptr};
+    QPushButton *m_btnDelete{nullptr};
+    QLabel *m_dragIndicator{nullptr};
+
+    bool m_editMode{false};
+    bool m_canRemove{false};
+    bool m_dropHighlighted{false};
+    QPoint m_dragStartPos;
 };
 
 } // namespace qworldclock

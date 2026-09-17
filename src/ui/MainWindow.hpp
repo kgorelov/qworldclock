@@ -5,6 +5,7 @@
 #include <QMainWindow>
 #include <QActionGroup>
 
+class QFrame;
 class QLabel;
 class QContextMenuEvent;
 
@@ -41,6 +42,7 @@ private:
     // Core data & UI components
     GridModel *m_gridModel{nullptr};
     ClockGridPanel *m_gridPanel{nullptr};
+    QFrame *m_editBanner{nullptr};
 
     QLabel *m_statusLabel{nullptr};
     QAction *m_editModeAction{nullptr};
