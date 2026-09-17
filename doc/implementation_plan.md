@@ -14,6 +14,7 @@ Based on [doc/idea.md](file:///home/kgorelov/git/qworldclock/doc/idea.md), **QWo
 - **Timezone Selection**: Adding a clock presents a searchable dialog with IANA timezones, location names, UTC offsets, and custom caption overrides.
 - **Clock Reorganization**: Clocks can be dragged and repositioned within the grid during edit mode.
 - **Clock Deletion**: Clocks can be removed from the grid; a minimum of one clock is strictly enforced.
+- **Clocks Alignment**: Configurable alignment of clocks within the panel/window (**Left**, **Right**, **Center**).
 - **Dual Sizing Modes**:
   1. *Responsive Mode*: Clocks dynamically scale with window resizing while preserving geometry and aspect ratio.
   2. *Fixed-Size Mode*: Clocks maintain a user-defined fixed size (e.g., Small, Medium, Large, or custom px) with auto-wrapping / scrolling.
@@ -52,8 +53,8 @@ flowchart TD
 
 | Component | Responsibility | Base Class |
 | :--- | :--- | :--- |
-| `MainWindow` | Top-level window, menus, sizing mode switcher, edit mode toggle, global shortcut handling. | `QMainWindow` |
-| `ClockGridPanel` | Manages 2D grid matrix of clocks, relative directional insertion, drag-and-drop events, and spatial normalization. | `QWidget` / `QGridLayout` |
+| `MainWindow` | Top-level window, menus, sizing mode switcher, clocks alignment toggle group (Left/Center/Right), edit mode toggle, global shortcut handling. | `QMainWindow` |
+| `ClockGridPanel` | Manages 2D grid matrix of clocks, relative directional insertion, drag-and-drop events, clocks alignment (Left, Center, Right), and spatial normalization. | `QWidget` / `QGridLayout` |
 | `ClockCardWidget` | Container card wrapping the analog clock face, caption label, and edit controls (add buttons, delete button, drag handle). | `QFrame` |
 | `AnalogClockWidget` | Renders the analog clock dial, hour/minute/second hands, tick marks, and optional day/night tint via `QPainter`. | `QWidget` |
 | `TimeEngine` | Centralized timer service delivering synchronized 1-second ticks to all clock widgets to prevent timer drift and CPU wakeups. | `QObject` |
@@ -133,6 +134,22 @@ The grid is modeled as a sparse 2D matrix:
    - The grid panel is housed inside a `QScrollArea` with smooth scrolling.
    - Clocks maintain exact pixel dimensions regardless of window resize.
 
+### 3.7 Clocks Alignment (Left, Center, Right)
+Users can configure the horizontal alignment of clocks across the panel to suit their desktop workflow and multi-monitor setups:
+- **Alignment Modes**:
+  - **Left (`Qt::AlignLeft`)**: Clocks cluster against the left margin of the container; surplus horizontal space accumulates on the right.
+  - **Center (`Qt::AlignHCenter`)** *(Default)*: Clocks are centered horizontally within the panel/window with equal margin padding on both sides.
+  - **Right (`Qt::AlignRight`)**: Clocks cluster against the right margin; surplus horizontal space accumulates on the left.
+- **Layout Mechanics**:
+  - In **Fixed-Size Mode**: Dynamic horizontal spacers or layout alignment flags on the parent container shift the grid matrix toward the selected anchor within the `QScrollArea` viewport.
+  - In **Responsive Mode**: When window dimensions or aspect-ratio constraints produce horizontal margins, alignment dictates whether the clock grid hugs the left edge, centers, or docks to the right edge.
+  - **Per-Row Justification**: When a grid layout contains rows with unequal numbers of clocks, alignment also governs whether incomplete rows align to the left, center, or right relative to the wider rows.
+- **User Interface & Controls**:
+  - **View Menu**: A mutually exclusive radio action group: `Alignment -> Left | Center | Right`.
+  - **Toolbar Controls**: Segmented alignment buttons `[ ⇤ Left | ⬌ Center | ⇥ Right ]`.
+  - **Shortcuts**: `Ctrl+Shift+L` (Left), `Ctrl+Shift+C` (Center), `Ctrl+Shift+R` (Right).
+  - Selection updates the layout immediately and is automatically saved to the configuration file.
+
 ---
 
 ## 4. Configuration Storage & TOML Schema
@@ -150,6 +167,7 @@ The configuration file is stored at `~/.config/qworldclock/qworldclock.cfg`.
 version = "1.0.0"
 sizing_mode = "responsive"  # "responsive" or "fixed"
 fixed_clock_size = 180       # Clock diameter in pixels for fixed mode
+alignment = "center"         # "left", "center", or "right"
 show_seconds = true
 show_day_night = true
 dark_theme = "auto"          # "auto", "light", "dark"
@@ -242,8 +260,7 @@ qworldclock/
 ├── CMakeLists.txt
 ├── pixi.toml
 ├── doc/
-│   └── idea.md
-├── docs/
+│   ├── idea.md
 │   └── implementation_plan.md
 ├── resources/
 │   ├── icons/
@@ -332,12 +349,15 @@ flowchart LR
 - Provide real-time `QLineEdit` filter for instant lookup.
 - Include custom caption field defaulting to the selected city name.
 
-### Phase 6: Sizing Modes & Adaptive Window Layout
+### Phase 6: Sizing Modes, Alignment & Adaptive Window Layout
 - Implement **Responsive Mode**:
   - Clocks scale uniformly with window resize, maintaining 1:1 dial aspect ratio.
 - Implement **Fixed-Size Mode**:
   - Embed `ClockGridPanel` in `QScrollArea`.
   - Add size selector in menu/toolbar (`Small`, `Medium`, `Large`, or slider).
+- Implement **Clocks Alignment** (Left, Center, Right):
+  - Add mutually exclusive alignment actions to View menu and Toolbar.
+  - Implement dynamic margin/spacer management in `ClockGridPanel` to justify clocks left, center, or right.
 - Verify adaptive typography transitions smoothly between minimum and maximum bounds without clipping.
 
 ### Phase 7: Configuration Persistence (TOML)
@@ -345,9 +365,9 @@ flowchart LR
 - Handle default configuration creation on first launch (defaults to 1 local clock).
 - Save and restore:
   - Window geometry (width, height, position, maximized state).
-  - Sizing mode and fixed clock dimension.
+  - Sizing mode, fixed clock dimension, and clocks alignment setting (`left`, `center`, `right`).
   - Ordered list of clocks with IDs, timezone names, custom captions, and `(row, col)` positions.
-- Trigger auto-save on any layout modification, clock addition, deletion, or window resize.
+- Trigger auto-save on any layout modification, clock addition, deletion, alignment change, or window resize.
 
 ### Phase 8: Testing, Cross-Platform Verification & Refinement
 - **Unit Testing**:
@@ -369,6 +389,7 @@ flowchart LR
 | **Timezone Picker** | Fast search filter over all IANA zones; displays current time and UTC offset; allows custom caption override. |
 | **Drag & Drop** | In edit mode, dragging clock onto another swaps or shifts positions; persists across restarts. |
 | **Single Clock Guard** | When only 1 clock remains, delete button is disabled/hidden; user cannot delete the last clock. |
+| **Clocks Alignment** | Switching between Left, Center, and Right immediately realigns the clocks within the window; persists across application restarts. |
 | **Dual Sizing** | Responsive mode scales widgets when resizing window; Fixed mode keeps exact pixel sizes and enables scrolling. |
 | **Font Scaling** | Caption font dynamically increases/decreases with clock size; no text clipping or overlap. |
 | **Configuration** | Settings persist to `~/.config/qworldclock/qworldclock.cfg`; valid TOML format; restores exact layout on restart. |
