@@ -221,7 +221,7 @@ col = 1
 
 ### 5.2 Pixi Project Configuration (`pixi.toml`)
 ```toml
-[project]
+[workspace]
 name = "qworldclock"
 version = "0.1.0"
 description = "Multi-timezone world clock desktop application for distributed teams"
