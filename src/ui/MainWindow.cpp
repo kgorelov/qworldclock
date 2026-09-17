@@ -3,11 +3,12 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QContextMenuEvent>
 #include <QKeySequence>
 #include <QLabel>
+#include <QMenu>
 #include <QMenuBar>
 #include <QStatusBar>
-#include <QToolBar>
 #include <QVBoxLayout>
 
 namespace qworldclock {
@@ -22,7 +23,6 @@ void MainWindow::setupUi() {
     resize(800, 600);
 
     setupMenus();
-    setupToolBar();
     setupStatusBar();
 
     // Central placeholder widget for Phase 1
@@ -33,7 +33,8 @@ void MainWindow::setupUi() {
     auto *welcomeLabel = new QLabel(
         QStringLiteral("<h2>QWorldClock</h2>"
                        "<p>World Clock application initialized successfully.</p>"
-                       "<p><i>Phase 1: Environment &amp; Project Scaffolding</i></p>"),
+                       "<p><i>Clean interface: right-click anywhere for menu.</i></p>"
+                       "<p><small>Shortcuts: <b>Ctrl+M</b> toggle menu | <b>Ctrl+E</b> edit layout</small></p>"),
         centralWidget);
     welcomeLabel->setAlignment(Qt::AlignCenter);
     layout->addWidget(welcomeLabel);
@@ -46,14 +47,16 @@ void MainWindow::setupMenus() {
 
     // File Menu
     auto *fileMenu = menuBar->addMenu(tr("&File"));
-    auto *exitAction = fileMenu->addAction(tr("E&xit"), this, &QWidget::close);
-    exitAction->setShortcut(QKeySequence::Quit);
+    m_exitAction = fileMenu->addAction(tr("E&xit"), this, &QWidget::close);
+    m_exitAction->setShortcut(QKeySequence::Quit);
+    addAction(m_exitAction);
 
     // Edit Menu
     auto *editMenu = menuBar->addMenu(tr("&Edit"));
     m_editModeAction = editMenu->addAction(tr("&Edit Layout"), this, &MainWindow::onToggleEditMode);
     m_editModeAction->setCheckable(true);
     m_editModeAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+E")));
+    addAction(m_editModeAction);
 
     // View Menu
     auto *viewMenu = menuBar->addMenu(tr("&View"));
@@ -68,6 +71,7 @@ void MainWindow::setupMenus() {
     alignLeft->setData(QStringLiteral("left"));
     alignLeft->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+L")));
     m_alignmentGroup->addAction(alignLeft);
+    addAction(alignLeft);
 
     auto *alignCenter = alignmentMenu->addAction(tr("&Center"));
     alignCenter->setCheckable(true);
@@ -75,12 +79,14 @@ void MainWindow::setupMenus() {
     alignCenter->setData(QStringLiteral("center"));
     alignCenter->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+C")));
     m_alignmentGroup->addAction(alignCenter);
+    addAction(alignCenter);
 
     auto *alignRight = alignmentMenu->addAction(tr("&Right"));
     alignRight->setCheckable(true);
     alignRight->setData(QStringLiteral("right"));
     alignRight->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+R")));
     m_alignmentGroup->addAction(alignRight);
+    addAction(alignRight);
 
     connect(m_alignmentGroup, &QActionGroup::triggered, this, &MainWindow::onAlignmentChanged);
 
@@ -101,25 +107,52 @@ void MainWindow::setupMenus() {
     m_sizingGroup->addAction(fixedMode);
 
     connect(m_sizingGroup, &QActionGroup::triggered, this, &MainWindow::onSizingModeChanged);
-}
 
-void MainWindow::setupToolBar() {
-    auto *toolBar = addToolBar(tr("Main Toolbar"));
-    toolBar->setMovable(false);
+    viewMenu->addSeparator();
 
-    toolBar->addAction(m_editModeAction);
-    toolBar->addSeparator();
+    // Toggle Menu Bar Action
+    m_toggleMenuBarAction = viewMenu->addAction(tr("Show &Menu Bar"), this, &MainWindow::onToggleMenuBar);
+    m_toggleMenuBarAction->setCheckable(true);
+    m_toggleMenuBarAction->setChecked(true);
+    m_toggleMenuBarAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+M")));
+    addAction(m_toggleMenuBarAction);
 
-    // Add alignment quick actions to toolbar
-    for (auto *action : m_alignmentGroup->actions()) {
-        toolBar->addAction(action);
-    }
+    // Toggle Status Bar Action
+    m_toggleStatusBarAction = viewMenu->addAction(tr("Show &Status Bar"), this, &MainWindow::onToggleStatusBar);
+    m_toggleStatusBarAction->setCheckable(true);
+    m_toggleStatusBarAction->setChecked(true);
+    addAction(m_toggleStatusBarAction);
 }
 
 void MainWindow::setupStatusBar() {
     auto *statusBar = this->statusBar();
     m_statusLabel = new QLabel(tr("Ready"), this);
     statusBar->addWidget(m_statusLabel);
+}
+
+void MainWindow::contextMenuEvent(QContextMenuEvent *event) {
+    QMenu contextMenu(this);
+
+    contextMenu.addAction(m_editModeAction);
+    contextMenu.addSeparator();
+
+    auto *alignMenu = contextMenu.addMenu(tr("Clock Alignment"));
+    for (auto *action : m_alignmentGroup->actions()) {
+        alignMenu->addAction(action);
+    }
+
+    auto *sizingMenu = contextMenu.addMenu(tr("Sizing Mode"));
+    for (auto *action : m_sizingGroup->actions()) {
+        sizingMenu->addAction(action);
+    }
+
+    contextMenu.addSeparator();
+    contextMenu.addAction(m_toggleMenuBarAction);
+    contextMenu.addAction(m_toggleStatusBarAction);
+    contextMenu.addSeparator();
+    contextMenu.addAction(m_exitAction);
+
+    contextMenu.exec(event->globalPos());
 }
 
 void MainWindow::onToggleEditMode(bool checked) {
@@ -146,6 +179,19 @@ void MainWindow::onSizingModeChanged(QAction *action) {
     if (m_statusLabel) {
         m_statusLabel->setText(tr("Sizing mode set to: %1").arg(mode));
     }
+}
+
+void MainWindow::onToggleMenuBar(bool checked) {
+    menuBar()->setVisible(checked);
+    m_toggleMenuBarAction->setChecked(checked);
+    if (m_statusLabel) {
+        m_statusLabel->setText(checked ? tr("Menu bar shown") : tr("Menu bar hidden (press Ctrl+M or right-click to restore)"));
+    }
+}
+
+void MainWindow::onToggleStatusBar(bool checked) {
+    statusBar()->setVisible(checked);
+    m_toggleStatusBarAction->setChecked(checked);
 }
 
 } // namespace qworldclock
