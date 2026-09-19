@@ -17,6 +17,7 @@ private slots:
     void testRemoveAndNormalize();
     void testSwapAndMove();
     void testClockWorkingHours();
+    void testClockCaptionFontSize();
 };
 
 void TestGridModel::testInitialState() {
@@ -206,6 +207,41 @@ void TestGridModel::testClockWorkingHours() {
 
     // Non-existent ID returns false
     QVERIFY(!model.setClockWorkingHours(QStringLiteral("non-existent"), true, custom));
+}
+
+void TestGridModel::testClockCaptionFontSize() {
+    GridModel model;
+    model.addClock({QStringLiteral("c1"), QTimeZone::systemTimeZone(), QStringLiteral("Local"), 0, 0});
+
+    auto c1 = model.clockById(QStringLiteral("c1"));
+    QVERIFY(c1.has_value());
+    QCOMPARE(c1->hasCustomCaptionFontSize, false);
+    QCOMPARE(c1->customCaptionFontSize, 0);
+
+    bool layoutChangedEmitted = false;
+    connect(&model, &GridModel::layoutChanged, [&layoutChangedEmitted]() {
+        layoutChangedEmitted = true;
+    });
+
+    QVERIFY(model.setClockCaptionFontSize(QStringLiteral("c1"), true, 18));
+    QVERIFY(layoutChangedEmitted);
+
+    c1 = model.clockById(QStringLiteral("c1"));
+    QVERIFY(c1.has_value());
+    QCOMPARE(c1->hasCustomCaptionFontSize, true);
+    QCOMPARE(c1->customCaptionFontSize, 18);
+
+    // Reset back to global
+    layoutChangedEmitted = false;
+    QVERIFY(model.setClockCaptionFontSize(QStringLiteral("c1"), false));
+    QVERIFY(layoutChangedEmitted);
+
+    c1 = model.clockById(QStringLiteral("c1"));
+    QVERIFY(c1.has_value());
+    QCOMPARE(c1->hasCustomCaptionFontSize, false);
+
+    // Non-existent ID returns false
+    QVERIFY(!model.setClockCaptionFontSize(QStringLiteral("non-existent"), true, 18));
 }
 
 QTEST_MAIN(TestGridModel)

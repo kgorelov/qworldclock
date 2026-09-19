@@ -105,6 +105,7 @@ AppConfig ConfigManager::load() const {
         const QTime et = QTime::fromString(QString::fromStdString(endStr), QStringLiteral("HH:mm"));
         cfg.workingHours.startTime = st.isValid() ? st : QTime(8, 0);
         cfg.workingHours.endTime = et.isValid() ? et : QTime(18, 0);
+        cfg.captionFontSize = static_cast<int>((*appTbl)["caption_font_size"].value_or(0));
     }
 
     // [window]
@@ -149,6 +150,9 @@ AppConfig ConfigManager::load() const {
                 item.customWorkingHours.startTime = cSt.isValid() ? cSt : QTime(8, 0);
                 item.customWorkingHours.endTime = cEt.isValid() ? cEt : QTime(18, 0);
 
+                item.hasCustomCaptionFontSize = (*clockTbl)["has_custom_caption_font_size"].value_or(false);
+                item.customCaptionFontSize = static_cast<int>((*clockTbl)["caption_font_size"].value_or(0));
+
                 loadedClocks.append(item);
             }
         }
@@ -178,7 +182,8 @@ bool ConfigManager::save(const AppConfig &config) const {
         {"show_seconds", config.showSeconds},
         {"show_day_night", config.showDayNight},
         {"working_hours_start", config.workingHours.startTime.toString(QStringLiteral("HH:mm")).toStdString()},
-        {"working_hours_end", config.workingHours.endTime.toString(QStringLiteral("HH:mm")).toStdString()}
+        {"working_hours_end", config.workingHours.endTime.toString(QStringLiteral("HH:mm")).toStdString()},
+        {"caption_font_size", config.captionFontSize}
     });
 
     // [window]
@@ -204,7 +209,9 @@ bool ConfigManager::save(const AppConfig &config) const {
             {"col", c.col},
             {"has_custom_working_hours", c.hasCustomWorkingHours},
             {"working_hours_start", c.customWorkingHours.startTime.toString(QStringLiteral("HH:mm")).toStdString()},
-            {"working_hours_end", c.customWorkingHours.endTime.toString(QStringLiteral("HH:mm")).toStdString()}
+            {"working_hours_end", c.customWorkingHours.endTime.toString(QStringLiteral("HH:mm")).toStdString()},
+            {"has_custom_caption_font_size", c.hasCustomCaptionFontSize},
+            {"caption_font_size", c.customCaptionFontSize}
         });
     }
     root.insert_or_assign("clocks", std::move(clocksArr));

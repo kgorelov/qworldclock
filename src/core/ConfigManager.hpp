@@ -26,6 +26,7 @@ struct AppConfig {
     bool showSeconds{true};
     bool showDayNight{true};
     WorkingHours workingHours{8, 0, 18, 0};
+    int captionFontSize{0};
 
     WindowConfig window;
     QList<ClockItem> clocks;

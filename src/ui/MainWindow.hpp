@@ -57,8 +57,12 @@ private:
     void onSetGlobalWorkingHours(const WorkingHours &hours);
     void onSetGlobalStartTime(const QTime &time);
     void onSetGlobalEndTime(const QTime &time);
+    void onCaptionFontSizeChanged(QAction *action);
+    void onCustomCaptionFontSize();
+    void onSetGlobalCaptionFontSize(int size);
 
     QMenu *createWorkingHoursSubmenu(QWidget *parentMenu);
+    QMenu *createCaptionFontSizeSubmenu(QWidget *parentMenu);
 
     // Core data & UI components
     ConfigManager m_configManager;
@@ -78,12 +82,15 @@ private:
     QActionGroup *m_alignmentGroup{nullptr};
     QActionGroup *m_sizingGroup{nullptr};
     QActionGroup *m_clockSizeGroup{nullptr};
+    QActionGroup *m_captionFontSizeGroup{nullptr};
     QMenu *m_clockSizeMenu{nullptr};
+    QMenu *m_captionFontSizeMenu{nullptr};
     QMenu *m_workingHoursMenu{nullptr};
 
     bool m_showSeconds{true};
     bool m_showDayNight{true};
     WorkingHours m_workingHours{8, 0, 18, 0};
+    int m_captionFontSize{0};
     bool m_isLoadingConfig{false};
 };
 

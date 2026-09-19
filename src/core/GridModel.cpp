@@ -176,6 +176,20 @@ bool GridModel::setClockWorkingHours(const QString &id, bool hasCustom, const Wo
     return true;
 }
 
+bool GridModel::setClockCaptionFontSize(const QString &id, bool hasCustom, int size) {
+    auto it = findById(id);
+    if (it == m_clocks.end()) {
+        return false;
+    }
+
+    it->hasCustomCaptionFontSize = hasCustom;
+    if (hasCustom) {
+        it->customCaptionFontSize = size;
+    }
+    emit layoutChanged();
+    return true;
+}
+
 void GridModel::clear() {
     if (!m_clocks.empty()) {
         m_clocks.clear();

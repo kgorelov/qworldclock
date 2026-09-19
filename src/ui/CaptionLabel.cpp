@@ -38,6 +38,18 @@ void CaptionLabel::setTime(const QDateTime &utcNow) {
     update();
 }
 
+void CaptionLabel::setFontSize(int size) {
+    const int clamped = qMax(0, size);
+    if (m_fontSize != clamped) {
+        m_fontSize = clamped;
+        update();
+    }
+}
+
+int CaptionLabel::fontSize() const {
+    return m_fontSize;
+}
+
 QSize CaptionLabel::sizeHint() const {
     return {140, 48};
 }
@@ -90,10 +102,14 @@ void CaptionLabel::paintEvent(QPaintEvent * /*event*/) {
         return;
     }
 
-    // Adaptive font size calculation based on available widget width and height
-    int titlePixelSize = qBound(10, static_cast<int>(totalH * 0.36), 20);
-    titlePixelSize = qMin(titlePixelSize, qBound(10, static_cast<int>(totalW * 0.08), 20));
-    const int subPixelSize = qBound(9, static_cast<int>(titlePixelSize * 0.75), 13);
+    // Adaptive font size calculation based on available widget width and height, or user-selected size
+    int titlePixelSize = (m_fontSize > 0)
+                             ? qBound(8, m_fontSize, 36)
+                             : qBound(10, static_cast<int>(totalH * 0.36), 20);
+    if (m_fontSize <= 0) {
+        titlePixelSize = qMin(titlePixelSize, qBound(10, static_cast<int>(totalW * 0.08), 20));
+    }
+    const int subPixelSize = qBound(8, static_cast<int>(titlePixelSize * 0.75), 15);
 
     // 1. Configure Fonts and Measure Heights
     QFont titleFont = font();

@@ -433,4 +433,51 @@ void ClockCardWidget::updateEffectiveWorkingHours() {
     }
 }
 
+void ClockCardWidget::setCaptionFontSize(int size) {
+    if (m_customCaptionFontSize != size) {
+        m_customCaptionFontSize = size;
+        if (m_hasCustomCaptionFontSize) {
+            updateEffectiveCaptionFontSize();
+        }
+    }
+}
+
+int ClockCardWidget::captionFontSize() const {
+    return m_customCaptionFontSize;
+}
+
+void ClockCardWidget::setGlobalCaptionFontSize(int size) {
+    if (m_globalCaptionFontSize != size) {
+        m_globalCaptionFontSize = size;
+        if (!m_hasCustomCaptionFontSize) {
+            updateEffectiveCaptionFontSize();
+        }
+    }
+}
+
+int ClockCardWidget::globalCaptionFontSize() const {
+    return m_globalCaptionFontSize;
+}
+
+void ClockCardWidget::setHasCustomCaptionFontSize(bool custom) {
+    if (m_hasCustomCaptionFontSize != custom) {
+        m_hasCustomCaptionFontSize = custom;
+        updateEffectiveCaptionFontSize();
+    }
+}
+
+bool ClockCardWidget::hasCustomCaptionFontSize() const {
+    return m_hasCustomCaptionFontSize;
+}
+
+int ClockCardWidget::effectiveCaptionFontSize() const {
+    return m_hasCustomCaptionFontSize ? m_customCaptionFontSize : m_globalCaptionFontSize;
+}
+
+void ClockCardWidget::updateEffectiveCaptionFontSize() {
+    if (m_captionLabel) {
+        m_captionLabel->setFontSize(effectiveCaptionFontSize());
+    }
+}
+
 } // namespace qworldclock

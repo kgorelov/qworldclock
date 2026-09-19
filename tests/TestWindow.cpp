@@ -5,6 +5,7 @@
 #include <QScrollBar>
 #include <QTest>
 #include "ui/AnalogClockWidget.hpp"
+#include "ui/CaptionLabel.hpp"
 #include "ui/ClockCardWidget.hpp"
 #include "ui/ClockGridPanel.hpp"
 #include "ui/MainWindow.hpp"
@@ -22,6 +23,7 @@ private slots:
     void testAlignments();
     void testEndToEndPersistence();
     void testWorkingHoursAndOverride();
+    void testCaptionFontSizeAndOverride();
 
 private:
     QString m_testDir;
@@ -333,6 +335,124 @@ void TestWindow::testWorkingHoursAndOverride() {
         QVERIFY(!tokyoCard->hasCustomWorkingHours());
         QCOMPARE(tokyoCard->effectiveWorkingHours(), WorkingHours(10, 0, 15, 0));
         QCOMPARE(tokyoCard->analogClock()->workingHours(), WorkingHours(10, 0, 15, 0));
+    }
+}
+
+void TestWindow::testCaptionFontSizeAndOverride() {
+    const QString cfgPath = m_testDir + QStringLiteral("/caption_font_size.cfg");
+
+    // Session 1: Configure global caption font size and per-clock override
+    {
+        MainWindow session1(cfgPath);
+        session1.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&session1));
+        qApp->processEvents();
+
+        auto *panel = session1.findChild<ClockGridPanel *>();
+        QVERIFY(panel != nullptr);
+
+        // Default global caption font size is 0 (auto)
+        QCOMPARE(panel->globalCaptionFontSize(), 0);
+
+        auto *localCard = panel->cardWidget(QStringLiteral("clock-local"));
+        QVERIFY(localCard != nullptr);
+        QCOMPARE(localCard->effectiveCaptionFontSize(), 0);
+        QCOMPARE(localCard->captionLabel()->fontSize(), 0);
+
+        // Change global caption font size to 17
+        panel->setGlobalCaptionFontSize(17);
+        QCOMPARE(panel->globalCaptionFontSize(), 17);
+        QCOMPARE(localCard->effectiveCaptionFontSize(), 17);
+        QCOMPARE(localCard->captionLabel()->fontSize(), 17);
+
+        // Add a second clock (Tokyo)
+        QVERIFY(panel->addClockRelative(QStringLiteral("clock-local"),
+                                        Direction::Right,
+                                        QTimeZone("Asia/Tokyo"),
+                                        QStringLiteral("Tokyo HQ")));
+        qApp->processEvents();
+
+        const auto &clocks = panel->model()->clocks();
+        QCOMPARE(clocks.size(), 2);
+        QString tokyoId;
+        for (const auto &c : clocks) {
+            if (c.id != QStringLiteral("clock-local")) {
+                tokyoId = c.id;
+                break;
+            }
+        }
+        QVERIFY(!tokyoId.isEmpty());
+
+        auto *tokyoCard = panel->cardWidget(tokyoId);
+        QVERIFY(tokyoCard != nullptr);
+        // Initially inherits global caption font size
+        QVERIFY(!tokyoCard->hasCustomCaptionFontSize());
+        QCOMPARE(tokyoCard->effectiveCaptionFontSize(), 17);
+        QCOMPARE(tokyoCard->captionLabel()->fontSize(), 17);
+
+        // Override Tokyo caption font size to 11
+        QVERIFY(panel->model()->setClockCaptionFontSize(tokyoId, true, 11));
+        tokyoCard->setHasCustomCaptionFontSize(true);
+        tokyoCard->setCaptionFontSize(11);
+
+        QVERIFY(tokyoCard->hasCustomCaptionFontSize());
+        QCOMPARE(tokyoCard->effectiveCaptionFontSize(), 11);
+        QCOMPARE(tokyoCard->captionLabel()->fontSize(), 11);
+
+        // Changing global to 20 should affect localCard but not tokyoCard
+        panel->setGlobalCaptionFontSize(20);
+        QCOMPARE(localCard->effectiveCaptionFontSize(), 20);
+        QCOMPARE(localCard->captionLabel()->fontSize(), 20);
+        QCOMPARE(tokyoCard->effectiveCaptionFontSize(), 11);
+        QCOMPARE(tokyoCard->captionLabel()->fontSize(), 11);
+
+        session1.close();
+    }
+
+    // Verify persistence in Session 2
+    {
+        MainWindow session2(cfgPath);
+        session2.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&session2));
+        qApp->processEvents();
+
+        auto *panel = session2.findChild<ClockGridPanel *>();
+        QVERIFY(panel != nullptr);
+
+        // Global caption font size restored to 20
+        QCOMPARE(panel->globalCaptionFontSize(), 20);
+
+        auto *localCard = panel->cardWidget(QStringLiteral("clock-local"));
+        QVERIFY(localCard != nullptr);
+        QVERIFY(!localCard->hasCustomCaptionFontSize());
+        QCOMPARE(localCard->effectiveCaptionFontSize(), 20);
+        QCOMPARE(localCard->captionLabel()->fontSize(), 20);
+
+        // Tokyo card restored with custom caption font size 11
+        const auto &clocks = panel->model()->clocks();
+        QCOMPARE(clocks.size(), 2);
+        QString tokyoId;
+        for (const auto &c : clocks) {
+            if (c.id != QStringLiteral("clock-local")) {
+                tokyoId = c.id;
+                break;
+            }
+        }
+        QVERIFY(!tokyoId.isEmpty());
+
+        auto *tokyoCard = panel->cardWidget(tokyoId);
+        QVERIFY(tokyoCard != nullptr);
+        QVERIFY(tokyoCard->hasCustomCaptionFontSize());
+        QCOMPARE(tokyoCard->captionFontSize(), 11);
+        QCOMPARE(tokyoCard->effectiveCaptionFontSize(), 11);
+        QCOMPARE(tokyoCard->captionLabel()->fontSize(), 11);
+
+        // Reset Tokyo card back to global
+        QVERIFY(panel->model()->setClockCaptionFontSize(tokyoId, false));
+        tokyoCard->setHasCustomCaptionFontSize(false);
+        QVERIFY(!tokyoCard->hasCustomCaptionFontSize());
+        QCOMPARE(tokyoCard->effectiveCaptionFontSize(), 20);
+        QCOMPARE(tokyoCard->captionLabel()->fontSize(), 20);
     }
 }
 

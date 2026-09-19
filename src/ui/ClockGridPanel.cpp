@@ -4,6 +4,7 @@
 #include <QAction>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QMenu>
 #include <QResizeEvent>
 #include <QUuid>
@@ -89,6 +90,23 @@ void ClockGridPanel::setGlobalWorkingHours(const WorkingHours &hours) {
 
 WorkingHours ClockGridPanel::globalWorkingHours() const {
     return m_globalWorkingHours;
+}
+
+void ClockGridPanel::setGlobalCaptionFontSize(int size) {
+    const int clamped = qMax(0, size);
+    if (m_captionFontSize != clamped) {
+        m_captionFontSize = clamped;
+        for (auto *card : m_cardWidgets) {
+            if (card) {
+                card->setGlobalCaptionFontSize(clamped);
+            }
+        }
+        emit globalCaptionFontSizeChanged(clamped);
+    }
+}
+
+int ClockGridPanel::globalCaptionFontSize() const {
+    return m_captionFontSize;
 }
 
 void ClockGridPanel::applySizingToCard(ClockCardWidget *card) {
@@ -223,6 +241,11 @@ ClockCardWidget *ClockGridPanel::createCardWidget(const ClockItem &item) {
     if (item.hasCustomWorkingHours) {
         card->setCustomWorkingHours(item.customWorkingHours);
     }
+    card->setGlobalCaptionFontSize(m_captionFontSize);
+    card->setHasCustomCaptionFontSize(item.hasCustomCaptionFontSize);
+    if (item.hasCustomCaptionFontSize) {
+        card->setCaptionFontSize(item.customCaptionFontSize);
+    }
     applySizingToCard(card);
 
     // Connect edit overlay buttons
@@ -321,9 +344,71 @@ ClockCardWidget *ClockGridPanel::createCardWidget(const ClockItem &item) {
         addPreset(tr("08:00 - 17:00 (8 to 5)"), 8, 0, 17, 0);
         addPreset(tr("07:00 - 19:00 (Extended)"), 7, 0, 19, 0);
 
+        // 2. Caption Font Size submenu
+        auto *fontMenu = menu.addMenu(tr("Caption &Font Size"));
+
+        const QString globalSizeStr = (m_captionFontSize == 0)
+                                          ? tr("Auto")
+                                          : tr("%1 px").arg(m_captionFontSize);
+        auto *useGlobalFontAction = fontMenu->addAction(tr("Use &Global Size (%1)").arg(globalSizeStr));
+        useGlobalFontAction->setCheckable(true);
+        useGlobalFontAction->setChecked(!card->hasCustomCaptionFontSize());
+        connect(useGlobalFontAction, &QAction::triggered, this, [this, card]() {
+            if (m_model) {
+                m_model->setClockCaptionFontSize(card->clockId(), false);
+            }
+            card->setHasCustomCaptionFontSize(false);
+        });
+
+        fontMenu->addSeparator();
+
+        auto addCardFontSizeAction = [this, card, fontMenu](const QString &title, int sz) {
+            auto *act = fontMenu->addAction(title);
+            act->setCheckable(true);
+            if (card->hasCustomCaptionFontSize() && card->captionFontSize() == sz) {
+                act->setChecked(true);
+            }
+            connect(act, &QAction::triggered, this, [this, card, sz]() {
+                if (m_model) {
+                    m_model->setClockCaptionFontSize(card->clockId(), true, sz);
+                }
+                card->setHasCustomCaptionFontSize(true);
+                card->setCaptionFontSize(sz);
+            });
+        };
+
+        addCardFontSizeAction(tr("&Auto (Adaptive)"), 0);
+        addCardFontSizeAction(tr("&Small (11 px)"), 11);
+        addCardFontSizeAction(tr("&Medium (14 px)"), 14);
+        addCardFontSizeAction(tr("&Large (17 px)"), 17);
+        addCardFontSizeAction(tr("&Extra Large (20 px)"), 20);
+
+        fontMenu->addSeparator();
+        auto *customFontAction = fontMenu->addAction(tr("&Custom Size..."));
+        connect(customFontAction, &QAction::triggered, this, [this, card]() {
+            bool ok = false;
+            const int cur = card->effectiveCaptionFontSize() > 0 ? card->effectiveCaptionFontSize() : 14;
+            const int sz = QInputDialog::getInt(
+                card,
+                tr("Custom Caption Font Size"),
+                tr("Font size in pixels (8 - 36):"),
+                cur,
+                8,
+                36,
+                1,
+                &ok);
+            if (ok) {
+                if (m_model) {
+                    m_model->setClockCaptionFontSize(card->clockId(), true, sz);
+                }
+                card->setHasCustomCaptionFontSize(true);
+                card->setCaptionFontSize(sz);
+            }
+        });
+
         menu.addSeparator();
 
-        // 2. Direct top-level quick actions
+        // 3. Direct top-level quick actions
         auto *quickConfig = menu.addAction(tr("&Configure Working Hours..."));
         connect(quickConfig, &QAction::triggered, this, [this, card]() {
             emit requestConfigureClockWorkingHours(card->clockId());
@@ -333,6 +418,16 @@ ClockCardWidget *ClockGridPanel::createCardWidget(const ClockItem &item) {
             auto *resetAction = menu.addAction(tr("&Reset to Global Working Hours"));
             connect(resetAction, &QAction::triggered, this, [this, card]() {
                 emit requestResetClockWorkingHours(card->clockId());
+            });
+        }
+
+        if (card->hasCustomCaptionFontSize()) {
+            auto *resetFontAction = menu.addAction(tr("&Reset to Global Caption Font Size"));
+            connect(resetFontAction, &QAction::triggered, this, [this, card]() {
+                if (m_model) {
+                    m_model->setClockCaptionFontSize(card->clockId(), false);
+                }
+                card->setHasCustomCaptionFontSize(false);
             });
         }
 
@@ -402,6 +497,11 @@ void ClockGridPanel::refreshLayout() {
             card->setHasCustomWorkingHours(item.hasCustomWorkingHours);
             if (item.hasCustomWorkingHours) {
                 card->setCustomWorkingHours(item.customWorkingHours);
+            }
+            card->setGlobalCaptionFontSize(m_captionFontSize);
+            card->setHasCustomCaptionFontSize(item.hasCustomCaptionFontSize);
+            if (item.hasCustomCaptionFontSize) {
+                card->setCaptionFontSize(item.customCaptionFontSize);
             }
             applySizingToCard(card);
         }

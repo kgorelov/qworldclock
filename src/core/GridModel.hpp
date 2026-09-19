@@ -25,6 +25,8 @@ struct ClockItem {
     int col{0};
     bool hasCustomWorkingHours{false};
     WorkingHours customWorkingHours{8, 0, 18, 0};
+    bool hasCustomCaptionFontSize{false};
+    int customCaptionFontSize{0};
 
     bool operator==(const ClockItem &other) const {
         return id == other.id;
@@ -45,6 +47,7 @@ public:
     bool swapClocks(const QString &id1, const QString &id2);
     bool moveClock(const QString &id, int targetRow, int targetCol);
     bool setClockWorkingHours(const QString &id, bool hasCustom, const WorkingHours &hours = WorkingHours());
+    bool setClockCaptionFontSize(const QString &id, bool hasCustom, int size = 0);
     void clear();
 
     // Queries

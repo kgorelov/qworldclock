@@ -67,6 +67,17 @@ void MainWindow::setupUi() {
         m_workingHours = hours;
         saveConfig();
     });
+    connect(m_gridPanel, &ClockGridPanel::globalCaptionFontSizeChanged, this, [this](int size) {
+        m_captionFontSize = size;
+        if (m_captionFontSizeMenu) {
+            for (auto *act : m_captionFontSizeMenu->actions()) {
+                if (!act->isSeparator() && act->data().isValid()) {
+                    act->setChecked(act->data().toInt() == size);
+                }
+            }
+        }
+        saveConfig();
+    });
 
     // Host grid and edit banner inside a vertical main layout
     auto *mainContainer = new QWidget(this);
@@ -220,6 +231,9 @@ void MainWindow::setupMenus() {
     m_clockSizeMenu->addSeparator();
     m_clockSizeMenu->addAction(tr("&Custom Size..."), this, &MainWindow::onCustomClockSize);
 
+    m_captionFontSizeMenu = createCaptionFontSizeSubmenu(viewMenu);
+    viewMenu->addMenu(m_captionFontSizeMenu);
+
     viewMenu->addSeparator();
 
     // Seconds and Day/Night Toggles
@@ -278,6 +292,8 @@ void MainWindow::contextMenuEvent(QContextMenuEvent *event) {
     }
     sizeMenu->addSeparator();
     sizeMenu->addAction(tr("Custom Size..."), this, &MainWindow::onCustomClockSize);
+
+    contextMenu.addMenu(createCaptionFontSizeSubmenu(&contextMenu));
 
     contextMenu.addSeparator();
     contextMenu.addAction(m_toggleSecondsAction);
@@ -597,6 +613,82 @@ void MainWindow::onSetGlobalEndTime(const QTime &time) {
     onSetGlobalWorkingHours(WorkingHours(m_workingHours.startTime, time));
 }
 
+QMenu *MainWindow::createCaptionFontSizeSubmenu(QWidget *parentMenu) {
+    auto *menu = new QMenu(tr("Caption &Font Size"), parentMenu);
+    auto *group = new QActionGroup(menu);
+    group->setExclusive(true);
+
+    auto addSizeAction = [this, menu, group](const QString &text, int sz) {
+        auto *act = menu->addAction(text);
+        act->setCheckable(true);
+        act->setData(sz);
+        if (m_captionFontSize == sz) {
+            act->setChecked(true);
+        }
+        group->addAction(act);
+        connect(act, &QAction::triggered, this, [this, sz]() {
+            onSetGlobalCaptionFontSize(sz);
+        });
+        return act;
+    };
+
+    addSizeAction(tr("&Auto (Adaptive)"), 0);
+    addSizeAction(tr("&Small (11 px)"), 11);
+    addSizeAction(tr("&Medium (14 px)"), 14);
+    addSizeAction(tr("&Large (17 px)"), 17);
+    addSizeAction(tr("&Extra Large (20 px)"), 20);
+
+    menu->addSeparator();
+    menu->addAction(tr("&Custom Size..."), this, &MainWindow::onCustomCaptionFontSize);
+
+    return menu;
+}
+
+void MainWindow::onCaptionFontSizeChanged(QAction *action) {
+    if (!action) {
+        return;
+    }
+    onSetGlobalCaptionFontSize(action->data().toInt());
+}
+
+void MainWindow::onCustomCaptionFontSize() {
+    bool ok = false;
+    const int cur = m_captionFontSize > 0 ? m_captionFontSize : 14;
+    const int sz = QInputDialog::getInt(
+        this,
+        tr("Custom Caption Font Size"),
+        tr("Font size in pixels (8 - 36):"),
+        cur,
+        8,
+        36,
+        1,
+        &ok);
+    if (ok) {
+        onSetGlobalCaptionFontSize(sz);
+    }
+}
+
+void MainWindow::onSetGlobalCaptionFontSize(int size) {
+    const int clamped = qMax(0, size);
+    m_captionFontSize = clamped;
+    if (m_gridPanel) {
+        m_gridPanel->setGlobalCaptionFontSize(clamped);
+    }
+    if (m_captionFontSizeMenu) {
+        for (auto *act : m_captionFontSizeMenu->actions()) {
+            if (!act->isSeparator() && act->data().isValid()) {
+                act->setChecked(act->data().toInt() == clamped);
+            }
+        }
+    }
+    saveConfig();
+
+    if (m_statusLabel) {
+        const QString szStr = (clamped == 0) ? tr("Auto (Adaptive)") : tr("%1 px").arg(clamped);
+        m_statusLabel->setText(tr("Caption font size set to: %1").arg(szStr));
+    }
+}
+
 void MainWindow::closeEvent(QCloseEvent *event) {
     saveConfig();
     QMainWindow::closeEvent(event);
@@ -681,6 +773,18 @@ void MainWindow::loadConfig() {
         m_gridPanel->setGlobalWorkingHours(m_workingHours);
     }
 
+    m_captionFontSize = cfg.captionFontSize;
+    if (m_gridPanel) {
+        m_gridPanel->setGlobalCaptionFontSize(m_captionFontSize);
+    }
+    if (m_captionFontSizeMenu) {
+        for (auto *act : m_captionFontSizeMenu->actions()) {
+            if (!act->isSeparator() && act->data().isValid()) {
+                act->setChecked(act->data().toInt() == m_captionFontSize);
+            }
+        }
+    }
+
     if (m_toggleMenuBarAction) {
         m_toggleMenuBarAction->setChecked(cfg.showMenuBar);
     }
@@ -720,6 +824,7 @@ void MainWindow::saveConfig() {
     cfg.showSeconds = m_showSeconds;
     cfg.showDayNight = m_showDayNight;
     cfg.workingHours = m_workingHours;
+    cfg.captionFontSize = m_captionFontSize;
 
     cfg.window.maximized = isMaximized();
     if (!isMaximized()) {

@@ -71,6 +71,17 @@ public:
 
     [[nodiscard]] WorkingHours effectiveWorkingHours() const;
 
+    void setCaptionFontSize(int size);
+    [[nodiscard]] int captionFontSize() const;
+
+    void setGlobalCaptionFontSize(int size);
+    [[nodiscard]] int globalCaptionFontSize() const;
+
+    void setHasCustomCaptionFontSize(bool custom);
+    [[nodiscard]] bool hasCustomCaptionFontSize() const;
+
+    [[nodiscard]] int effectiveCaptionFontSize() const;
+
     [[nodiscard]] QSize sizeHint() const override;
     [[nodiscard]] QSize minimumSizeHint() const override;
 
@@ -96,6 +107,7 @@ private:
     void updateButtonPositions();
     void updateCardStyle();
     void updateEffectiveWorkingHours();
+    void updateEffectiveCaptionFontSize();
 
     QString m_clockId;
     int m_gridRow{0};
@@ -121,6 +133,10 @@ private:
     bool m_hasCustomWorkingHours{false};
     WorkingHours m_customWorkingHours{8, 0, 18, 0};
     WorkingHours m_globalWorkingHours{8, 0, 18, 0};
+
+    bool m_hasCustomCaptionFontSize{false};
+    int m_customCaptionFontSize{0};
+    int m_globalCaptionFontSize{0};
 };
 
 } // namespace qworldclock

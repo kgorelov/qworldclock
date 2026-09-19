@@ -41,6 +41,9 @@ public:
     void setGlobalWorkingHours(const WorkingHours &hours);
     [[nodiscard]] WorkingHours globalWorkingHours() const;
 
+    void setGlobalCaptionFontSize(int size);
+    [[nodiscard]] int globalCaptionFontSize() const;
+
     // Helper methods for adding / removing clocks
     bool addClockRelative(const QString &refId, Direction direction, const QTimeZone &timeZone, const QString &caption);
     bool removeClock(const QString &id);
@@ -60,6 +63,7 @@ signals:
     void requestResetClockWorkingHours(const QString &clockId);
     void requestGlobalWorkingHours();
     void globalWorkingHoursChanged(const WorkingHours &hours);
+    void globalCaptionFontSizeChanged(int size);
 
 public slots:
     void refreshLayout();
@@ -85,6 +89,7 @@ private:
     int m_fixedClockSize{190};
     bool m_editMode{false};
     WorkingHours m_globalWorkingHours{8, 0, 18, 0};
+    int m_captionFontSize{0};
 };
 
 } // namespace qworldclock

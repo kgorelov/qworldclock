@@ -44,6 +44,7 @@ void TestConfigManager::testDefaultConfig() {
     QCOMPARE(def.showSeconds, true);
     QCOMPARE(def.showDayNight, true);
     QCOMPARE(def.workingHours, WorkingHours(8, 0, 18, 0));
+    QCOMPARE(def.captionFontSize, 0);
     QCOMPARE(def.window.width, 900);
     QCOMPARE(def.window.height, 650);
     QCOMPARE(def.clocks.size(), 1);
@@ -52,6 +53,8 @@ void TestConfigManager::testDefaultConfig() {
     QCOMPARE(def.clocks[0].row, 0);
     QCOMPARE(def.clocks[0].col, 0);
     QCOMPARE(def.clocks[0].hasCustomWorkingHours, false);
+    QCOMPARE(def.clocks[0].hasCustomCaptionFontSize, false);
+    QCOMPARE(def.clocks[0].customCaptionFontSize, 0);
 }
 
 void TestConfigManager::testSaveAndLoad() {
@@ -68,6 +71,7 @@ void TestConfigManager::testSaveAndLoad() {
     savedCfg.showSeconds = false;
     savedCfg.showDayNight = false;
     savedCfg.workingHours = WorkingHours(9, 15, 17, 45);
+    savedCfg.captionFontSize = 16;
 
     savedCfg.window.width = 1200;
     savedCfg.window.height = 800;
@@ -75,9 +79,9 @@ void TestConfigManager::testSaveAndLoad() {
     savedCfg.window.y = 150;
     savedCfg.window.maximized = true;
 
-    ClockItem c1{QStringLiteral("c1"), QTimeZone::systemTimeZone(), QStringLiteral("Local"), 0, 0, false, WorkingHours(8, 0, 18, 0)};
-    ClockItem c2{QStringLiteral("c2"), QTimeZone("Europe/London"), QStringLiteral("London Office"), 0, 1, true, WorkingHours(7, 30, 16, 0)};
-    ClockItem c3{QStringLiteral("c3"), QTimeZone("Asia/Tokyo"), QStringLiteral("Tokyo HQ"), 1, 0, false, WorkingHours(8, 0, 18, 0)};
+    ClockItem c1{QStringLiteral("c1"), QTimeZone::systemTimeZone(), QStringLiteral("Local"), 0, 0, false, WorkingHours(8, 0, 18, 0), false, 0};
+    ClockItem c2{QStringLiteral("c2"), QTimeZone("Europe/London"), QStringLiteral("London Office"), 0, 1, true, WorkingHours(7, 30, 16, 0), true, 18};
+    ClockItem c3{QStringLiteral("c3"), QTimeZone("Asia/Tokyo"), QStringLiteral("Tokyo HQ"), 1, 0, false, WorkingHours(8, 0, 18, 0), false, 0};
 
     savedCfg.clocks = {c1, c2, c3};
 
@@ -94,6 +98,7 @@ void TestConfigManager::testSaveAndLoad() {
     QCOMPARE(loadedCfg.showSeconds, savedCfg.showSeconds);
     QCOMPARE(loadedCfg.showDayNight, savedCfg.showDayNight);
     QCOMPARE(loadedCfg.workingHours, savedCfg.workingHours);
+    QCOMPARE(loadedCfg.captionFontSize, savedCfg.captionFontSize);
 
     QCOMPARE(loadedCfg.window.width, savedCfg.window.width);
     QCOMPARE(loadedCfg.window.height, savedCfg.window.height);
@@ -107,6 +112,8 @@ void TestConfigManager::testSaveAndLoad() {
     QCOMPARE(loadedCfg.clocks[0].row, 0);
     QCOMPARE(loadedCfg.clocks[0].col, 0);
     QCOMPARE(loadedCfg.clocks[0].hasCustomWorkingHours, false);
+    QCOMPARE(loadedCfg.clocks[0].hasCustomCaptionFontSize, false);
+    QCOMPARE(loadedCfg.clocks[0].customCaptionFontSize, 0);
 
     QCOMPARE(loadedCfg.clocks[1].id, QStringLiteral("c2"));
     QCOMPARE(loadedCfg.clocks[1].caption, QStringLiteral("London Office"));
@@ -115,6 +122,8 @@ void TestConfigManager::testSaveAndLoad() {
     QCOMPARE(loadedCfg.clocks[1].col, 1);
     QCOMPARE(loadedCfg.clocks[1].hasCustomWorkingHours, true);
     QCOMPARE(loadedCfg.clocks[1].customWorkingHours, WorkingHours(7, 30, 16, 0));
+    QCOMPARE(loadedCfg.clocks[1].hasCustomCaptionFontSize, true);
+    QCOMPARE(loadedCfg.clocks[1].customCaptionFontSize, 18);
 
     QCOMPARE(loadedCfg.clocks[2].id, QStringLiteral("c3"));
     QCOMPARE(loadedCfg.clocks[2].caption, QStringLiteral("Tokyo HQ"));
@@ -122,6 +131,8 @@ void TestConfigManager::testSaveAndLoad() {
     QCOMPARE(loadedCfg.clocks[2].row, 1);
     QCOMPARE(loadedCfg.clocks[2].col, 0);
     QCOMPARE(loadedCfg.clocks[2].hasCustomWorkingHours, false);
+    QCOMPARE(loadedCfg.clocks[2].hasCustomCaptionFontSize, false);
+    QCOMPARE(loadedCfg.clocks[2].customCaptionFontSize, 0);
 }
 
 void TestConfigManager::testMissingFileFallback() {
