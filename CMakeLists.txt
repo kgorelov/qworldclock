@@ -65,6 +65,50 @@ target_link_libraries(qworldclock
         tomlplusplus::tomlplusplus
 )
 
+# Deploy Qt dependencies on Windows
+if(WIN32 AND DEFINED ENV{CONDA_PREFIX})
+    set(CONDA_BIN_DIR "$ENV{CONDA_PREFIX}/Library/bin")
+    set(QT_BIN_DIR "$ENV{CONDA_PREFIX}/Library/lib/qt6/bin")
+    set(QT_PLUGINS_DIR "$ENV{CONDA_PREFIX}/Library/lib/qt6/plugins")
+
+    # Copy Qt DLLs
+    add_custom_command(TARGET qworldclock POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${QT_BIN_DIR}/Qt6Core.dll"
+            "${QT_BIN_DIR}/Qt6Gui.dll"
+            "${QT_BIN_DIR}/Qt6Widgets.dll"
+            "$<TARGET_FILE_DIR:qworldclock>/"
+        COMMENT "Copying Qt DLLs"
+    )
+
+    # Copy platform plugins (required for Qt apps to run)
+    add_custom_command(TARGET qworldclock POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:qworldclock>/platforms"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${QT_PLUGINS_DIR}/platforms/qwindows.dll"
+            "$<TARGET_FILE_DIR:qworldclock>/platforms/"
+        COMMENT "Copying Qt platform plugins"
+    )
+
+    # Copy runtime dependencies (system libraries that Qt depends on)
+    add_custom_command(TARGET qworldclock POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CONDA_BIN_DIR}/libpng16.dll"
+            "${CONDA_BIN_DIR}/zlib.dll"
+            "${CONDA_BIN_DIR}/pcre2-16.dll"
+            "${CONDA_BIN_DIR}/zstd.dll"
+            "${CONDA_BIN_DIR}/freetype.dll"
+            "${CONDA_BIN_DIR}/harfbuzz.dll"
+            "${CONDA_BIN_DIR}/libbz2.dll"
+            "${CONDA_BIN_DIR}/double-conversion.dll"
+            "${CONDA_BIN_DIR}/icuin78.dll"
+            "${CONDA_BIN_DIR}/icuuc78.dll"
+            "${CONDA_BIN_DIR}/icudt78.dll"
+            "$<TARGET_FILE_DIR:qworldclock>/"
+        COMMENT "Copying Qt runtime dependencies"
+    )
+endif()
+
 # Enable testing if Qt6Test is found
 if(TARGET Qt6::Test AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt)
     enable_testing()
