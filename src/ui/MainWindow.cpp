@@ -4,6 +4,7 @@
 #include "ui/ClockCardWidget.hpp"
 #include "ui/ClockGridPanel.hpp"
 #include "ui/TimeZoneDialog.hpp"
+#include "ui/WorkingHoursDialog.hpp"
 
 #include <QAction>
 #include <QActionGroup>
@@ -59,6 +60,13 @@ void MainWindow::setupUi() {
         }
     });
     connect(m_gridPanel, &ClockGridPanel::requestAddClock, this, &MainWindow::onAddClockRequested);
+    connect(m_gridPanel, &ClockGridPanel::requestConfigureClockWorkingHours, this, &MainWindow::onConfigureClockWorkingHours);
+    connect(m_gridPanel, &ClockGridPanel::requestResetClockWorkingHours, this, &MainWindow::onResetClockWorkingHours);
+    connect(m_gridPanel, &ClockGridPanel::requestGlobalWorkingHours, this, &MainWindow::onConfigureGlobalWorkingHours);
+    connect(m_gridPanel, &ClockGridPanel::globalWorkingHoursChanged, this, [this](const WorkingHours &hours) {
+        m_workingHours = hours;
+        saveConfig();
+    });
 
     // Host grid and edit banner inside a vertical main layout
     auto *mainContainer = new QWidget(this);
@@ -223,6 +231,9 @@ void MainWindow::setupMenus() {
     m_toggleDayNightAction->setCheckable(true);
     m_toggleDayNightAction->setChecked(true);
 
+    m_workingHoursMenu = createWorkingHoursSubmenu(viewMenu);
+    viewMenu->addMenu(m_workingHoursMenu);
+
     viewMenu->addSeparator();
 
     // Toggle Menu Bar Action
@@ -271,6 +282,7 @@ void MainWindow::contextMenuEvent(QContextMenuEvent *event) {
     contextMenu.addSeparator();
     contextMenu.addAction(m_toggleSecondsAction);
     contextMenu.addAction(m_toggleDayNightAction);
+    contextMenu.addMenu(createWorkingHoursSubmenu(&contextMenu));
 
     contextMenu.addSeparator();
     contextMenu.addAction(m_toggleMenuBarAction);
@@ -431,6 +443,160 @@ void MainWindow::onAddClockRequested(const QString &refId, Direction direction) 
     }
 }
 
+QMenu *MainWindow::createWorkingHoursSubmenu(QWidget *parentMenu) {
+    auto *whMenu = new QMenu(tr("&Working Hours"), parentMenu);
+
+    auto *configAction = whMenu->addAction(tr("&Configure Working Hours..."), this, &MainWindow::onConfigureGlobalWorkingHours);
+    configAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+W")));
+    addAction(configAction);
+
+    whMenu->addSeparator();
+
+    // Start Time Submenu
+    auto *startMenu = whMenu->addMenu(tr("&Start Time"));
+    const int curStartHour = m_workingHours.startTime.hour();
+    for (int h = 0; h < 24; ++h) {
+        const QTime t(h, 0);
+        auto *act = startMenu->addAction(t.toString(QStringLiteral("HH:mm")));
+        act->setCheckable(true);
+        if (curStartHour == h && m_workingHours.startTime.minute() == 0) {
+            act->setChecked(true);
+        }
+        connect(act, &QAction::triggered, this, [this, t]() {
+            onSetGlobalStartTime(t);
+        });
+    }
+
+    // End Time Submenu
+    auto *endMenu = whMenu->addMenu(tr("&End Time"));
+    const int curEndHour = m_workingHours.endTime.hour();
+    for (int h = 0; h < 24; ++h) {
+        const QTime t(h, 0);
+        auto *act = endMenu->addAction(t.toString(QStringLiteral("HH:mm")));
+        act->setCheckable(true);
+        if (curEndHour == h && m_workingHours.endTime.minute() == 0) {
+            act->setChecked(true);
+        }
+        connect(act, &QAction::triggered, this, [this, t]() {
+            onSetGlobalEndTime(t);
+        });
+    }
+
+    whMenu->addSeparator();
+
+    auto addPresetAction = [this, whMenu](const QString &title, int sh, int sm, int eh, int em) {
+        auto *act = whMenu->addAction(title);
+        connect(act, &QAction::triggered, this, [this, sh, sm, eh, em]() {
+            onSetGlobalWorkingHours(WorkingHours(QTime(sh, sm), QTime(eh, em)));
+        });
+    };
+
+    addPresetAction(tr("08:00 - 18:00 (Standard)"), 8, 0, 18, 0);
+    addPresetAction(tr("09:00 - 17:00 (9 to 5)"), 9, 0, 17, 0);
+    addPresetAction(tr("08:00 - 17:00 (8 to 5)"), 8, 0, 17, 0);
+    addPresetAction(tr("07:00 - 19:00 (Extended)"), 7, 0, 19, 0);
+
+    return whMenu;
+}
+
+void MainWindow::onConfigureGlobalWorkingHours() {
+    WorkingHoursDialog dialog(WorkingHoursDialogMode::Global,
+                              m_workingHours,
+                              m_workingHours,
+                              false,
+                              QString(),
+                              QTimeZone::systemTimeZone(),
+                              this);
+    if (dialog.exec() == QDialog::Accepted) {
+        onSetGlobalWorkingHours(dialog.workingHours());
+    }
+}
+
+void MainWindow::onConfigureClockWorkingHours(const QString &clockId) {
+    if (!m_gridModel) {
+        return;
+    }
+    const auto itemOpt = m_gridModel->clockById(clockId);
+    if (!itemOpt.has_value()) {
+        return;
+    }
+
+    const ClockItem &item = *itemOpt;
+    const WorkingHours curHours = item.hasCustomWorkingHours ? item.customWorkingHours : m_workingHours;
+
+    WorkingHoursDialog dialog(WorkingHoursDialogMode::PerClock,
+                              curHours,
+                              m_workingHours,
+                              item.hasCustomWorkingHours,
+                              item.caption,
+                              item.timeZone,
+                              this);
+
+    if (dialog.exec() == QDialog::Accepted) {
+        const bool isCustom = dialog.isCustomOverride();
+        const WorkingHours newHours = dialog.workingHours();
+
+        m_gridModel->setClockWorkingHours(clockId, isCustom, newHours);
+        if (m_gridPanel) {
+            auto *card = m_gridPanel->cardWidget(clockId);
+            if (card) {
+                card->setHasCustomWorkingHours(isCustom);
+                if (isCustom) {
+                    card->setCustomWorkingHours(newHours);
+                }
+            }
+        }
+        saveConfig();
+
+        if (m_statusLabel) {
+            if (isCustom) {
+                m_statusLabel->setText(tr("Working hours for %1 set to: %2").arg(item.caption, newHours.formatRange()));
+            } else {
+                m_statusLabel->setText(tr("%1 reset to global working hours (%2)").arg(item.caption, m_workingHours.formatRange()));
+            }
+        }
+    }
+}
+
+void MainWindow::onResetClockWorkingHours(const QString &clockId) {
+    if (!m_gridModel) {
+        return;
+    }
+    const auto itemOpt = m_gridModel->clockById(clockId);
+    m_gridModel->setClockWorkingHours(clockId, false);
+    if (m_gridPanel) {
+        auto *card = m_gridPanel->cardWidget(clockId);
+        if (card) {
+            card->setHasCustomWorkingHours(false);
+        }
+    }
+    saveConfig();
+
+    if (m_statusLabel && itemOpt.has_value()) {
+        m_statusLabel->setText(tr("%1 reset to global working hours (%2)").arg(itemOpt->caption, m_workingHours.formatRange()));
+    }
+}
+
+void MainWindow::onSetGlobalWorkingHours(const WorkingHours &hours) {
+    m_workingHours = hours;
+    if (m_gridPanel) {
+        m_gridPanel->setGlobalWorkingHours(hours);
+    }
+    saveConfig();
+
+    if (m_statusLabel) {
+        m_statusLabel->setText(tr("Global working hours set to: %1").arg(hours.formatRange()));
+    }
+}
+
+void MainWindow::onSetGlobalStartTime(const QTime &time) {
+    onSetGlobalWorkingHours(WorkingHours(time, m_workingHours.endTime));
+}
+
+void MainWindow::onSetGlobalEndTime(const QTime &time) {
+    onSetGlobalWorkingHours(WorkingHours(m_workingHours.startTime, time));
+}
+
 void MainWindow::closeEvent(QCloseEvent *event) {
     saveConfig();
     QMainWindow::closeEvent(event);
@@ -510,6 +676,11 @@ void MainWindow::loadConfig() {
     }
     onToggleDayNight(cfg.showDayNight);
 
+    m_workingHours = cfg.workingHours;
+    if (m_gridPanel) {
+        m_gridPanel->setGlobalWorkingHours(m_workingHours);
+    }
+
     if (m_toggleMenuBarAction) {
         m_toggleMenuBarAction->setChecked(cfg.showMenuBar);
     }
@@ -548,6 +719,7 @@ void MainWindow::saveConfig() {
     cfg.showStatusBar = statusBar()->isVisible();
     cfg.showSeconds = m_showSeconds;
     cfg.showDayNight = m_showDayNight;
+    cfg.workingHours = m_workingHours;
 
     cfg.window.maximized = isMaximized();
     if (!isMaximized()) {

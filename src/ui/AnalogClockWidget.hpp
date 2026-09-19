@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/WorkingHours.hpp"
+
 #include <QDateTime>
 #include <QTimeZone>
 #include <QWidget>
@@ -25,6 +27,9 @@ public:
     void setShowDayNightShading(bool show);
     [[nodiscard]] bool showDayNightShading() const;
 
+    void setWorkingHours(const WorkingHours &hours);
+    [[nodiscard]] WorkingHours workingHours() const;
+
     [[nodiscard]] bool isNightTime() const;
 
     [[nodiscard]] QSize sizeHint() const override;
@@ -42,6 +47,7 @@ private:
     QDateTime m_currentUtcTime;
     bool m_showSeconds{true};
     bool m_showDayNightShading{true};
+    WorkingHours m_workingHours{8, 0, 18, 0};
 };
 
 } // namespace qworldclock

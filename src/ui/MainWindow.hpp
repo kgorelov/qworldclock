@@ -51,6 +51,14 @@ private:
     void onToggleSeconds(bool checked);
     void onToggleDayNight(bool checked);
     void onAddClockRequested(const QString &refId, Direction direction);
+    void onConfigureGlobalWorkingHours();
+    void onConfigureClockWorkingHours(const QString &clockId);
+    void onResetClockWorkingHours(const QString &clockId);
+    void onSetGlobalWorkingHours(const WorkingHours &hours);
+    void onSetGlobalStartTime(const QTime &time);
+    void onSetGlobalEndTime(const QTime &time);
+
+    QMenu *createWorkingHoursSubmenu(QWidget *parentMenu);
 
     // Core data & UI components
     ConfigManager m_configManager;
@@ -71,9 +79,11 @@ private:
     QActionGroup *m_sizingGroup{nullptr};
     QActionGroup *m_clockSizeGroup{nullptr};
     QMenu *m_clockSizeMenu{nullptr};
+    QMenu *m_workingHoursMenu{nullptr};
 
     bool m_showSeconds{true};
     bool m_showDayNight{true};
+    WorkingHours m_workingHours{8, 0, 18, 0};
     bool m_isLoadingConfig{false};
 };
 

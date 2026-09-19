@@ -4,6 +4,7 @@
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QTest>
+#include "ui/AnalogClockWidget.hpp"
 #include "ui/ClockCardWidget.hpp"
 #include "ui/ClockGridPanel.hpp"
 #include "ui/MainWindow.hpp"
@@ -20,6 +21,7 @@ private slots:
     void testMultipleClocksResponsive();
     void testAlignments();
     void testEndToEndPersistence();
+    void testWorkingHoursAndOverride();
 
 private:
     QString m_testDir;
@@ -195,6 +197,142 @@ void TestWindow::testEndToEndPersistence() {
 
         // Menu bar visibility restored
         QCOMPARE(session2.menuBar()->isVisible(), false);
+    }
+}
+
+void TestWindow::testWorkingHoursAndOverride() {
+    const QString cfgPath = m_testDir + QStringLiteral("/working_hours.cfg");
+
+    // Session 1: Configure global working hours and clock override
+    {
+        MainWindow session1(cfgPath);
+        session1.resize(900, 650);
+        session1.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&session1));
+        qApp->processEvents();
+
+        auto *panel = session1.findChild<ClockGridPanel *>();
+        QVERIFY(panel != nullptr);
+
+        // Verify default global working hours
+        QCOMPARE(panel->globalWorkingHours(), WorkingHours(8, 0, 18, 0));
+
+        auto *localCard = panel->cardWidget(QStringLiteral("clock-local"));
+        QVERIFY(localCard != nullptr);
+        QVERIFY(!localCard->hasCustomWorkingHours());
+        QCOMPARE(localCard->effectiveWorkingHours(), WorkingHours(8, 0, 18, 0));
+
+        // Test day/night transition on clock widget
+        auto *localAnalog = localCard->analogClock();
+        QVERIFY(localAnalog != nullptr);
+        QCOMPARE(localAnalog->workingHours(), WorkingHours(8, 0, 18, 0));
+
+        // 12:00 UTC with UTC timezone => day
+        localAnalog->setTimeZone(QTimeZone::utc());
+        localAnalog->setTime(QDateTime(QDate(2026, 9, 19), QTime(12, 0, 0), QTimeZone::utc()));
+        QVERIFY(!localAnalog->isNightTime());
+
+        // 22:00 UTC with UTC timezone => night
+        localAnalog->setTime(QDateTime(QDate(2026, 9, 19), QTime(22, 0, 0), QTimeZone::utc()));
+        QVERIFY(localAnalog->isNightTime());
+
+        // Change global working hours to 10:00 - 15:00
+        panel->setGlobalWorkingHours(WorkingHours(10, 0, 15, 0));
+        QCOMPARE(localCard->effectiveWorkingHours(), WorkingHours(10, 0, 15, 0));
+        QCOMPARE(localAnalog->workingHours(), WorkingHours(10, 0, 15, 0));
+
+        // At 09:00: outside 10:00 - 15:00 => night
+        localAnalog->setTime(QDateTime(QDate(2026, 9, 19), QTime(9, 0, 0), QTimeZone::utc()));
+        QVERIFY(localAnalog->isNightTime());
+
+        // Add a second clock for Tokyo
+        QVERIFY(panel->addClockRelative(QStringLiteral("clock-local"), Direction::Right,
+                                        QTimeZone("Asia/Tokyo"), QStringLiteral("Tokyo HQ")));
+        qApp->processEvents();
+
+        const auto &clocks = panel->model()->clocks();
+        QCOMPARE(clocks.size(), 2);
+        QString tokyoId;
+        for (const auto &c : clocks) {
+            if (c.id != QStringLiteral("clock-local")) {
+                tokyoId = c.id;
+                break;
+            }
+        }
+        QVERIFY(!tokyoId.isEmpty());
+
+        auto *tokyoCard = panel->cardWidget(tokyoId);
+        QVERIFY(tokyoCard != nullptr);
+        // Initially inherits global working hours
+        QVERIFY(!tokyoCard->hasCustomWorkingHours());
+        QCOMPARE(tokyoCard->effectiveWorkingHours(), WorkingHours(10, 0, 15, 0));
+
+        // Override Tokyo working hours to 06:00 - 22:00
+        const WorkingHours tokyoHours(6, 0, 22, 0);
+        QVERIFY(panel->model()->setClockWorkingHours(tokyoId, true, tokyoHours));
+        tokyoCard->setHasCustomWorkingHours(true);
+        tokyoCard->setCustomWorkingHours(tokyoHours);
+
+        QVERIFY(tokyoCard->hasCustomWorkingHours());
+        QCOMPARE(tokyoCard->effectiveWorkingHours(), tokyoHours);
+        QCOMPARE(tokyoCard->analogClock()->workingHours(), tokyoHours);
+
+        // Tokyo analog clock: local time 08:00 (UTC 23:00 previous day)
+        // 08:00 is within 06:00 - 22:00 => day!
+        tokyoCard->analogClock()->setTime(QDateTime(QDate(2026, 9, 19), QTime(23, 0, 0), QTimeZone::utc()));
+        // Tokyo is UTC+9 => 23:00 + 9h = 08:00 next day
+        QVERIFY(!tokyoCard->analogClock()->isNightTime());
+
+        // At Tokyo local time 02:00 (UTC 17:00) => outside 06:00 - 22:00 => night
+        tokyoCard->analogClock()->setTime(QDateTime(QDate(2026, 9, 19), QTime(17, 0, 0), QTimeZone::utc()));
+        QVERIFY(tokyoCard->analogClock()->isNightTime());
+
+        session1.close();
+    }
+
+    // Verify persistence in Session 2
+    {
+        MainWindow session2(cfgPath);
+        session2.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&session2));
+        qApp->processEvents();
+
+        auto *panel = session2.findChild<ClockGridPanel *>();
+        QVERIFY(panel != nullptr);
+
+        // Global working hours restored
+        QCOMPARE(panel->globalWorkingHours(), WorkingHours(10, 0, 15, 0));
+
+        auto *localCard = panel->cardWidget(QStringLiteral("clock-local"));
+        QVERIFY(localCard != nullptr);
+        QVERIFY(!localCard->hasCustomWorkingHours());
+        QCOMPARE(localCard->effectiveWorkingHours(), WorkingHours(10, 0, 15, 0));
+
+        // Tokyo card restored with custom working hours
+        const auto &clocks = panel->model()->clocks();
+        QCOMPARE(clocks.size(), 2);
+        QString tokyoId;
+        for (const auto &c : clocks) {
+            if (c.id != QStringLiteral("clock-local")) {
+                tokyoId = c.id;
+                break;
+            }
+        }
+        QVERIFY(!tokyoId.isEmpty());
+
+        auto *tokyoCard = panel->cardWidget(tokyoId);
+        QVERIFY(tokyoCard != nullptr);
+        QVERIFY(tokyoCard->hasCustomWorkingHours());
+        QCOMPARE(tokyoCard->customWorkingHours(), WorkingHours(6, 0, 22, 0));
+        QCOMPARE(tokyoCard->effectiveWorkingHours(), WorkingHours(6, 0, 22, 0));
+        QCOMPARE(tokyoCard->analogClock()->workingHours(), WorkingHours(6, 0, 22, 0));
+
+        // Reset Tokyo card back to global
+        QVERIFY(panel->model()->setClockWorkingHours(tokyoId, false));
+        tokyoCard->setHasCustomWorkingHours(false);
+        QVERIFY(!tokyoCard->hasCustomWorkingHours());
+        QCOMPARE(tokyoCard->effectiveWorkingHours(), WorkingHours(10, 0, 15, 0));
+        QCOMPARE(tokyoCard->analogClock()->workingHours(), WorkingHours(10, 0, 15, 0));
     }
 }
 

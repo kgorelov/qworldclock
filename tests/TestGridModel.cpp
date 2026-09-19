@@ -16,6 +16,7 @@ private slots:
     void testSingleClockGuard();
     void testRemoveAndNormalize();
     void testSwapAndMove();
+    void testClockWorkingHours();
 };
 
 void TestGridModel::testInitialState() {
@@ -170,6 +171,41 @@ void TestGridModel::testSwapAndMove() {
     c1 = model.clockById(QStringLiteral("c1"));
     QCOMPARE(c1->row, 1);
     QCOMPARE(c1->col, 0);
+}
+
+void TestGridModel::testClockWorkingHours() {
+    GridModel model;
+    model.addClock({QStringLiteral("c1"), QTimeZone::systemTimeZone(), QStringLiteral("Local"), 0, 0});
+
+    auto c1 = model.clockById(QStringLiteral("c1"));
+    QVERIFY(c1.has_value());
+    QCOMPARE(c1->hasCustomWorkingHours, false);
+
+    bool layoutChangedEmitted = false;
+    connect(&model, &GridModel::layoutChanged, [&layoutChangedEmitted]() {
+        layoutChangedEmitted = true;
+    });
+
+    const WorkingHours custom(7, 30, 16, 0);
+    QVERIFY(model.setClockWorkingHours(QStringLiteral("c1"), true, custom));
+    QVERIFY(layoutChangedEmitted);
+
+    c1 = model.clockById(QStringLiteral("c1"));
+    QVERIFY(c1.has_value());
+    QCOMPARE(c1->hasCustomWorkingHours, true);
+    QCOMPARE(c1->customWorkingHours, custom);
+
+    // Reset back to global
+    layoutChangedEmitted = false;
+    QVERIFY(model.setClockWorkingHours(QStringLiteral("c1"), false));
+    QVERIFY(layoutChangedEmitted);
+
+    c1 = model.clockById(QStringLiteral("c1"));
+    QVERIFY(c1.has_value());
+    QCOMPARE(c1->hasCustomWorkingHours, false);
+
+    // Non-existent ID returns false
+    QVERIFY(!model.setClockWorkingHours(QStringLiteral("non-existent"), true, custom));
 }
 
 QTEST_MAIN(TestGridModel)

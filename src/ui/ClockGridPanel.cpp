@@ -75,6 +75,22 @@ int ClockGridPanel::fixedClockSize() const {
     return m_fixedClockSize;
 }
 
+void ClockGridPanel::setGlobalWorkingHours(const WorkingHours &hours) {
+    if (m_globalWorkingHours != hours) {
+        m_globalWorkingHours = hours;
+        for (auto *card : m_cardWidgets) {
+            if (card) {
+                card->setGlobalWorkingHours(hours);
+            }
+        }
+        emit globalWorkingHoursChanged(hours);
+    }
+}
+
+WorkingHours ClockGridPanel::globalWorkingHours() const {
+    return m_globalWorkingHours;
+}
+
 void ClockGridPanel::applySizingToCard(ClockCardWidget *card) {
     if (!card) {
         return;
@@ -202,6 +218,11 @@ ClockCardWidget *ClockGridPanel::createCardWidget(const ClockItem &item) {
     card->setGridCol(item.col);
     card->setEditMode(m_editMode);
     card->setCanRemove(m_model ? m_model->canRemove() : false);
+    card->setGlobalWorkingHours(m_globalWorkingHours);
+    card->setHasCustomWorkingHours(item.hasCustomWorkingHours);
+    if (item.hasCustomWorkingHours) {
+        card->setCustomWorkingHours(item.customWorkingHours);
+    }
     applySizingToCard(card);
 
     // Connect edit overlay buttons
@@ -220,6 +241,104 @@ ClockCardWidget *ClockGridPanel::createCardWidget(const ClockItem &item) {
     connect(card, &QWidget::customContextMenuRequested, this, [this, card](const QPoint &pos) {
         QMenu menu(card);
 
+        // 1. Working Hours submenu
+        auto *whMenu = menu.addMenu(tr("&Working Hours"));
+
+        auto *configWH = whMenu->addAction(tr("&Configure Working Hours..."));
+        connect(configWH, &QAction::triggered, this, [this, card]() {
+            emit requestConfigureClockWorkingHours(card->clockId());
+        });
+
+        auto *useGlobalAction = whMenu->addAction(tr("Use &Global Working Hours (%1)").arg(m_globalWorkingHours.formatRange()));
+        useGlobalAction->setCheckable(true);
+        useGlobalAction->setChecked(!card->hasCustomWorkingHours());
+        connect(useGlobalAction, &QAction::triggered, this, [this, card](bool checked) {
+            if (checked) {
+                emit requestResetClockWorkingHours(card->clockId());
+            } else {
+                emit requestConfigureClockWorkingHours(card->clockId());
+            }
+        });
+
+        whMenu->addSeparator();
+
+        // Start Time submenu
+        auto *startMenu = whMenu->addMenu(tr("Override &Start Time"));
+        const QTime curStart = card->effectiveWorkingHours().startTime;
+        for (int h = 0; h < 24; ++h) {
+            const QTime t(h, 0);
+            auto *act = startMenu->addAction(t.toString(QStringLiteral("HH:mm")));
+            act->setCheckable(true);
+            if (card->hasCustomWorkingHours() && curStart.hour() == h && curStart.minute() == 0) {
+                act->setChecked(true);
+            }
+            connect(act, &QAction::triggered, this, [this, card, t]() {
+                const WorkingHours cur = card->effectiveWorkingHours();
+                const WorkingHours newHours(t, cur.endTime);
+                if (m_model) {
+                    m_model->setClockWorkingHours(card->clockId(), true, newHours);
+                }
+                card->setHasCustomWorkingHours(true);
+                card->setCustomWorkingHours(newHours);
+            });
+        }
+
+        // End Time submenu
+        auto *endMenu = whMenu->addMenu(tr("Override &End Time"));
+        const QTime curEnd = card->effectiveWorkingHours().endTime;
+        for (int h = 0; h < 24; ++h) {
+            const QTime t(h, 0);
+            auto *act = endMenu->addAction(t.toString(QStringLiteral("HH:mm")));
+            act->setCheckable(true);
+            if (card->hasCustomWorkingHours() && curEnd.hour() == h && curEnd.minute() == 0) {
+                act->setChecked(true);
+            }
+            connect(act, &QAction::triggered, this, [this, card, t]() {
+                const WorkingHours cur = card->effectiveWorkingHours();
+                const WorkingHours newHours(cur.startTime, t);
+                if (m_model) {
+                    m_model->setClockWorkingHours(card->clockId(), true, newHours);
+                }
+                card->setHasCustomWorkingHours(true);
+                card->setCustomWorkingHours(newHours);
+            });
+        }
+
+        whMenu->addSeparator();
+        auto addPreset = [this, card, whMenu](const QString &title, int sh, int sm, int eh, int em) {
+            auto *act = whMenu->addAction(title);
+            connect(act, &QAction::triggered, this, [this, card, sh, sm, eh, em]() {
+                const WorkingHours preset(QTime(sh, sm), QTime(eh, em));
+                if (m_model) {
+                    m_model->setClockWorkingHours(card->clockId(), true, preset);
+                }
+                card->setHasCustomWorkingHours(true);
+                card->setCustomWorkingHours(preset);
+            });
+        };
+        addPreset(tr("08:00 - 18:00 (Standard)"), 8, 0, 18, 0);
+        addPreset(tr("09:00 - 17:00 (9 to 5)"), 9, 0, 17, 0);
+        addPreset(tr("08:00 - 17:00 (8 to 5)"), 8, 0, 17, 0);
+        addPreset(tr("07:00 - 19:00 (Extended)"), 7, 0, 19, 0);
+
+        menu.addSeparator();
+
+        // 2. Direct top-level quick actions
+        auto *quickConfig = menu.addAction(tr("&Configure Working Hours..."));
+        connect(quickConfig, &QAction::triggered, this, [this, card]() {
+            emit requestConfigureClockWorkingHours(card->clockId());
+        });
+
+        if (card->hasCustomWorkingHours()) {
+            auto *resetAction = menu.addAction(tr("&Reset to Global Working Hours"));
+            connect(resetAction, &QAction::triggered, this, [this, card]() {
+                emit requestResetClockWorkingHours(card->clockId());
+            });
+        }
+
+        menu.addSeparator();
+
+        // 3. Grid positioning actions
         auto *addRight = menu.addAction(tr("Add Clock to Right"));
         auto *addLeft = menu.addAction(tr("Add Clock to Left"));
         auto *addBelow = menu.addAction(tr("Add Clock Below"));
@@ -244,6 +363,10 @@ ClockCardWidget *ClockGridPanel::createCardWidget(const ClockItem &item) {
         connect(removeAction, &QAction::triggered, this, [this, card]() {
             removeClock(card->clockId());
         });
+
+        menu.addSeparator();
+        auto *globalWhAction = menu.addAction(tr("&Global Working Hours..."));
+        connect(globalWhAction, &QAction::triggered, this, &ClockGridPanel::requestGlobalWorkingHours);
 
         menu.exec(card->mapToGlobal(pos));
     });
@@ -275,6 +398,11 @@ void ClockGridPanel::refreshLayout() {
             card->setGridCol(item.col);
             card->setEditMode(m_editMode);
             card->setCanRemove(canRemoveClocks);
+            card->setGlobalWorkingHours(m_globalWorkingHours);
+            card->setHasCustomWorkingHours(item.hasCustomWorkingHours);
+            if (item.hasCustomWorkingHours) {
+                card->setCustomWorkingHours(item.customWorkingHours);
+            }
             applySizingToCard(card);
         }
 

@@ -98,6 +98,13 @@ AppConfig ConfigManager::load() const {
         cfg.showStatusBar = (*appTbl)["show_status_bar"].value_or(true);
         cfg.showSeconds = (*appTbl)["show_seconds"].value_or(true);
         cfg.showDayNight = (*appTbl)["show_day_night"].value_or(true);
+
+        const std::string startStr = (*appTbl)["working_hours_start"].value_or("08:00");
+        const std::string endStr = (*appTbl)["working_hours_end"].value_or("18:00");
+        const QTime st = QTime::fromString(QString::fromStdString(startStr), QStringLiteral("HH:mm"));
+        const QTime et = QTime::fromString(QString::fromStdString(endStr), QStringLiteral("HH:mm"));
+        cfg.workingHours.startTime = st.isValid() ? st : QTime(8, 0);
+        cfg.workingHours.endTime = et.isValid() ? et : QTime(18, 0);
     }
 
     // [window]
@@ -133,6 +140,14 @@ AppConfig ConfigManager::load() const {
                 item.caption = QString::fromStdString((*clockTbl)["caption"].value_or(""));
                 item.row = static_cast<int>((*clockTbl)["row"].value_or(0));
                 item.col = static_cast<int>((*clockTbl)["col"].value_or(0));
+                item.hasCustomWorkingHours = (*clockTbl)["has_custom_working_hours"].value_or(false);
+
+                const std::string cStartStr = (*clockTbl)["working_hours_start"].value_or("08:00");
+                const std::string cEndStr = (*clockTbl)["working_hours_end"].value_or("18:00");
+                const QTime cSt = QTime::fromString(QString::fromStdString(cStartStr), QStringLiteral("HH:mm"));
+                const QTime cEt = QTime::fromString(QString::fromStdString(cEndStr), QStringLiteral("HH:mm"));
+                item.customWorkingHours.startTime = cSt.isValid() ? cSt : QTime(8, 0);
+                item.customWorkingHours.endTime = cEt.isValid() ? cEt : QTime(18, 0);
 
                 loadedClocks.append(item);
             }
@@ -161,7 +176,9 @@ bool ConfigManager::save(const AppConfig &config) const {
         {"show_menu_bar", config.showMenuBar},
         {"show_status_bar", config.showStatusBar},
         {"show_seconds", config.showSeconds},
-        {"show_day_night", config.showDayNight}
+        {"show_day_night", config.showDayNight},
+        {"working_hours_start", config.workingHours.startTime.toString(QStringLiteral("HH:mm")).toStdString()},
+        {"working_hours_end", config.workingHours.endTime.toString(QStringLiteral("HH:mm")).toStdString()}
     });
 
     // [window]
@@ -184,7 +201,10 @@ bool ConfigManager::save(const AppConfig &config) const {
             {"timezone", tzStr.toStdString()},
             {"caption", c.caption.toStdString()},
             {"row", c.row},
-            {"col", c.col}
+            {"col", c.col},
+            {"has_custom_working_hours", c.hasCustomWorkingHours},
+            {"working_hours_start", c.customWorkingHours.startTime.toString(QStringLiteral("HH:mm")).toStdString()},
+            {"working_hours_end", c.customWorkingHours.endTime.toString(QStringLiteral("HH:mm")).toStdString()}
         });
     }
     root.insert_or_assign("clocks", std::move(clocksArr));

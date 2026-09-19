@@ -48,6 +48,7 @@ set(UI_SOURCES
     src/ui/ClockCardWidget.cpp
     src/ui/ClockGridPanel.cpp
     src/ui/TimeZoneDialog.cpp
+    src/ui/WorkingHoursDialog.cpp
 )
 
 # Main executable

@@ -12,6 +12,7 @@ AnalogClockWidget::AnalogClockWidget(QWidget *parent)
     , m_currentUtcTime(QDateTime::currentDateTimeUtc()) {
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     setAttribute(Qt::WA_OpaquePaintEvent, false);
+    setContextMenuPolicy(Qt::NoContextMenu);
 }
 
 void AnalogClockWidget::setTimeZone(const QTimeZone &timeZone) {
@@ -56,9 +57,19 @@ bool AnalogClockWidget::showDayNightShading() const {
     return m_showDayNightShading;
 }
 
+void AnalogClockWidget::setWorkingHours(const WorkingHours &hours) {
+    if (m_workingHours != hours) {
+        m_workingHours = hours;
+        update();
+    }
+}
+
+WorkingHours AnalogClockWidget::workingHours() const {
+    return m_workingHours;
+}
+
 bool AnalogClockWidget::isNightTime() const {
-    const int hour = localTime().time().hour();
-    return hour >= 20 || hour < 6;
+    return !m_workingHours.isWorkingHour(localTime().time());
 }
 
 QSize AnalogClockWidget::sizeHint() const {

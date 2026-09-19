@@ -8,6 +8,7 @@ namespace qworldclock {
 CaptionLabel::CaptionLabel(QWidget *parent)
     : QWidget(parent) {
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    setContextMenuPolicy(Qt::NoContextMenu);
 }
 
 void CaptionLabel::setCaption(const QString &caption) {

@@ -386,4 +386,51 @@ void ClockCardWidget::dropEvent(QDropEvent *event) {
     event->ignore();
 }
 
+void ClockCardWidget::setHasCustomWorkingHours(bool custom) {
+    if (m_hasCustomWorkingHours != custom) {
+        m_hasCustomWorkingHours = custom;
+        updateEffectiveWorkingHours();
+    }
+}
+
+bool ClockCardWidget::hasCustomWorkingHours() const {
+    return m_hasCustomWorkingHours;
+}
+
+void ClockCardWidget::setCustomWorkingHours(const WorkingHours &hours) {
+    if (m_customWorkingHours != hours) {
+        m_customWorkingHours = hours;
+        if (m_hasCustomWorkingHours) {
+            updateEffectiveWorkingHours();
+        }
+    }
+}
+
+WorkingHours ClockCardWidget::customWorkingHours() const {
+    return m_customWorkingHours;
+}
+
+void ClockCardWidget::setGlobalWorkingHours(const WorkingHours &hours) {
+    if (m_globalWorkingHours != hours) {
+        m_globalWorkingHours = hours;
+        if (!m_hasCustomWorkingHours) {
+            updateEffectiveWorkingHours();
+        }
+    }
+}
+
+WorkingHours ClockCardWidget::globalWorkingHours() const {
+    return m_globalWorkingHours;
+}
+
+WorkingHours ClockCardWidget::effectiveWorkingHours() const {
+    return m_hasCustomWorkingHours ? m_customWorkingHours : m_globalWorkingHours;
+}
+
+void ClockCardWidget::updateEffectiveWorkingHours() {
+    if (m_analogClock) {
+        m_analogClock->setWorkingHours(effectiveWorkingHours());
+    }
+}
+
 } // namespace qworldclock

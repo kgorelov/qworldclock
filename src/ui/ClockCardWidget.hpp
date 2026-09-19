@@ -60,6 +60,17 @@ public:
     void setResponsive();
     void setFixedClockSize(int clockDiameter);
 
+    void setHasCustomWorkingHours(bool custom);
+    [[nodiscard]] bool hasCustomWorkingHours() const;
+
+    void setCustomWorkingHours(const WorkingHours &hours);
+    [[nodiscard]] WorkingHours customWorkingHours() const;
+
+    void setGlobalWorkingHours(const WorkingHours &hours);
+    [[nodiscard]] WorkingHours globalWorkingHours() const;
+
+    [[nodiscard]] WorkingHours effectiveWorkingHours() const;
+
     [[nodiscard]] QSize sizeHint() const override;
     [[nodiscard]] QSize minimumSizeHint() const override;
 
@@ -84,6 +95,7 @@ private:
     void setupEditControls();
     void updateButtonPositions();
     void updateCardStyle();
+    void updateEffectiveWorkingHours();
 
     QString m_clockId;
     int m_gridRow{0};
@@ -105,6 +117,10 @@ private:
     bool m_dropHighlighted{false};
     QPoint m_dragStartPos;
     int m_clockDiameter{190};
+
+    bool m_hasCustomWorkingHours{false};
+    WorkingHours m_customWorkingHours{8, 0, 18, 0};
+    WorkingHours m_globalWorkingHours{8, 0, 18, 0};
 };
 
 } // namespace qworldclock

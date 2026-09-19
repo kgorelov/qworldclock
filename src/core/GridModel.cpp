@@ -162,6 +162,20 @@ bool GridModel::moveClock(const QString &id, int targetRow, int targetCol) {
     return true;
 }
 
+bool GridModel::setClockWorkingHours(const QString &id, bool hasCustom, const WorkingHours &hours) {
+    auto it = findById(id);
+    if (it == m_clocks.end()) {
+        return false;
+    }
+
+    it->hasCustomWorkingHours = hasCustom;
+    if (hasCustom) {
+        it->customWorkingHours = hours;
+    }
+    emit layoutChanged();
+    return true;
+}
+
 void GridModel::clear() {
     if (!m_clocks.empty()) {
         m_clocks.clear();

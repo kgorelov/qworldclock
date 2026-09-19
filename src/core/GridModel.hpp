@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/WorkingHours.hpp"
+
 #include <QObject>
 #include <QString>
 #include <QTimeZone>
@@ -21,6 +23,8 @@ struct ClockItem {
     QString caption;
     int row{0};
     int col{0};
+    bool hasCustomWorkingHours{false};
+    WorkingHours customWorkingHours{8, 0, 18, 0};
 
     bool operator==(const ClockItem &other) const {
         return id == other.id;
@@ -40,6 +44,7 @@ public:
     bool removeClock(const QString &id);
     bool swapClocks(const QString &id1, const QString &id2);
     bool moveClock(const QString &id, int targetRow, int targetCol);
+    bool setClockWorkingHours(const QString &id, bool hasCustom, const WorkingHours &hours = WorkingHours());
     void clear();
 
     // Queries

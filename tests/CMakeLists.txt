@@ -54,6 +54,7 @@ add_executable(test_window
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/ClockGridPanel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/MainWindow.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/TimeZoneDialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/WorkingHoursDialog.cpp
 )
 
 target_include_directories(test_window PRIVATE
