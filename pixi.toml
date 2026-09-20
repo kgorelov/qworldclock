@@ -15,6 +15,6 @@ tomlplusplus = ">=3.3"
 
 [tasks]
 configure = "cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release"
-build = "cmake --build build"
-test = "ctest --test-dir build --output-on-failure"
-run = "./build/qworldclock"
+build = { cmd = "cmake --build build", depends-on = ["configure"] }
+test = { cmd = "ctest --test-dir build --output-on-failure", depends-on = ["build"] }
+run = { cmd = "./build/qworldclock", depends-on = ["build"] }

@@ -2,6 +2,9 @@ name: Release
 
 on:
   push:
+    branches:
+      - 'release/**'
+      - 'release-*'
     tags:
       - '*'
   workflow_dispatch:
@@ -31,6 +34,9 @@ jobs:
         with:
           pixi-version: latest
           cache: true
+
+      - name: Configure CMake
+        run: pixi run configure
 
       - name: Build application
         run: pixi run build
