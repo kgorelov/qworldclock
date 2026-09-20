@@ -47,10 +47,6 @@ void TestWindow::testStartupFit() {
     QVERIFY(QTest::qWaitForWindowExposed(&window));
     qApp->processEvents();
 
-    QDir().mkpath(QStringLiteral("/home/kgorelov/.gemini/antigravity-cli/brain/88d5483d-5c0d-4588-9c75-e61e528b2895/scratch"));
-    const QPixmap pix = window.grab();
-    pix.save(QStringLiteral("/home/kgorelov/.gemini/antigravity-cli/brain/88d5483d-5c0d-4588-9c75-e61e528b2895/scratch/startup.png"));
-
     auto *scrollArea = window.findChild<QScrollArea *>();
     QVERIFY(scrollArea != nullptr);
 

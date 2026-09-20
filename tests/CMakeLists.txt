@@ -16,6 +16,23 @@ target_link_libraries(test_grid_model PRIVATE
 
 add_test(NAME GridModelTest COMMAND test_grid_model)
 
+# TimeEngine test
+add_executable(test_time_engine
+    TestTimeEngine.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/core/TimeEngine.cpp
+)
+
+target_include_directories(test_time_engine PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+
+target_link_libraries(test_time_engine PRIVATE
+    Qt6::Core
+    Qt6::Test
+)
+
+add_test(NAME TimeEngineTest COMMAND test_time_engine)
+
 # Config Manager test
 add_executable(test_config_manager
     TestConfigManager.cpp

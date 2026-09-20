@@ -376,14 +376,20 @@ flowchart LR
 - [x] Auto-save wired to clock addition, removal, reordering, alignment changes, sizing changes, visibility toggles, window close, and application quit.
 - [x] Verified unit tests in `TestConfigManager` and full end-to-end multi-session persistence in `TestWindow`.
 
-### Phase 8: Testing, Cross-Platform Verification & Refinement
-- **Unit Testing**:
+### Phase 8: Testing, Cross-Platform Verification & CI/CD Packaging (Completed)
+- [x] **Unit Testing**:
   - `TestConfigManager`: TOML parsing, serialization, invalid config recovery.
   - `TestGridModel`: Shifting algorithms for all 4 directions, normalization, single-clock constraint.
-  - `TestTimeEngine`: Timezone offset calculations, day rollover logic.
-- **Cross-Platform Verification**:
-  - Linux: Wayland & X11 testing, HiDPI scaling, XDG path compliance.
-  - Windows: Path separator handling, fonts, Windows look-and-feel.
+  - `TestTimeEngine`: Singleton lifecycle, tick signals, timezone offset calculations, day rollover logic.
+  - `TestWindow`: End-to-end window layout, responsive scaling, and persistence tests.
+- [x] **Cross-Platform Verification**:
+  - Linux: Clean headless test execution with `QT_QPA_PLATFORM=offscreen`, standard XDG configuration storage.
+  - Windows: Automatic runtime dependency and Qt platform plugin deployment next to executable.
+- [x] **GitHub Automated Builds & Releases**:
+  - Configured `.github/workflows/release.yml` with Pixi and GitHub Actions.
+  - Triggers on tag pushes and manual `workflow_dispatch`.
+  - Matrix builds and tests across Ubuntu (`linux-x64`) and Windows (`windows-x64`).
+  - Automatically packages and attaches `qworldclock-<tag>-linux-x64.tar.gz` and `qworldclock-<tag>-windows-x64.zip` to GitHub Releases.
 
 ---
 

@@ -34,6 +34,7 @@ private:
     void onTick();
 
     QTimer *m_timer{nullptr};
+    QTimer *m_alignmentTimer{nullptr};
 };
 
 } // namespace qworldclock
