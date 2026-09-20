@@ -67,10 +67,23 @@ if [ -n "$CONDA_PREFIX" ]; then
     fi
 fi
 
+# Ensure custom AppRun is executable
+chmod +x scripts/AppRun
+
+# Create qt.conf in AppDir root
+cat << 'EOF' > AppDir/qt.conf
+[Paths]
+Prefix = usr
+Plugins = usr/plugins
+Imports = usr/qml
+Qml2Imports = usr/qml
+EOF
+
 # Run linuxdeploy with Qt plugin and AppImage output
 ./build_tools/linuxdeploy-x86_64.AppImage --appimage-extract-and-run \
     --appdir AppDir \
     --plugin qt \
+    --custom-apprun scripts/AppRun \
     --output appimage \
     --desktop-file AppDir/usr/share/applications/qworldclock.desktop \
     --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/qworldclock.png
