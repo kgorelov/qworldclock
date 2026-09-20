@@ -115,3 +115,21 @@ if(TARGET Qt6::Test AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+# Installation rules
+if(UNIX AND NOT APPLE)
+    include(GNUInstallDirs)
+
+    install(
+        TARGETS qworldclock
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+    install(
+        FILES resources/icons/qworldclock.png
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
+    )
+    install(
+        FILES resources/qworldclock.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+    )
+endif()

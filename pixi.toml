@@ -18,3 +18,4 @@ configure = "cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release"
 build = { cmd = "cmake --build build", depends-on = ["configure"] }
 test = { cmd = "ctest --test-dir build --output-on-failure", depends-on = ["build"] }
 run = { cmd = "./build/qworldclock", depends-on = ["build"] }
+appimage = { cmd = "scripts/build_appimage.sh", depends-on = ["build"] }

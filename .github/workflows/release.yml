@@ -50,10 +50,30 @@ jobs:
         if: matrix.platform == 'linux-x64'
         shell: bash
         run: |
-          mkdir -p dist package/qworldclock
-          cp build/qworldclock package/qworldclock/
+          mkdir -p dist
           TAG_NAME="${GITHUB_REF_NAME//\//-}"
-          tar -czvf "dist/qworldclock-${TAG_NAME}-linux-x64.tar.gz" -C package qworldclock
+
+          # 1. Dynamic tarball (requires Qt6 on host)
+          mkdir -p package_qt6/qworldclock
+          cp build/qworldclock package_qt6/qworldclock/
+          tar -czvf "dist/qworldclock-${TAG_NAME}-linux-x86_64-qt6.tar.gz" -C package_qt6 qworldclock
+
+          # 2. Build AppImage and AppDir via pixi task
+          pixi run appimage
+
+          # 3. Copy generated AppImage to dist
+          cp QWorldClock-x86_64.AppImage "dist/qworldclock-${TAG_NAME}-linux-x86_64.AppImage"
+
+          # 4. Standalone bundle tarball (bundles all Qt libraries & plugins)
+          mkdir -p package_bundle/qworldclock
+          cp -a AppDir/* package_bundle/qworldclock/
+          cat << 'EOF' > package_bundle/qworldclock/qworldclock
+          #!/bin/bash
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec "$HERE/usr/bin/qworldclock" "$@"
+          EOF
+          chmod +x package_bundle/qworldclock/qworldclock
+          tar -czvf "dist/qworldclock-${TAG_NAME}-linux-x86_64-bundle.tar.gz" -C package_bundle qworldclock
 
       - name: Package Windows
         if: matrix.platform == 'windows-x64'

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Name=QWorldClock
+Comment=Multi-timezone world clock desktop application for distributed teams
+Exec=qworldclock
+Icon=qworldclock
+Terminal=false
+Type=Application
+Categories=Utility;Clock;Qt;

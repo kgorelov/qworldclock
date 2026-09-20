@@ -3,3 +3,6 @@ build/
 .cache/
 *.user
 CMakeUserPresets.json
+build_tools/
+AppDir/
+*.AppImage
