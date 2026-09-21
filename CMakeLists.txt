@@ -52,11 +52,20 @@ set(UI_SOURCES
 )
 
 # Main executable
-add_executable(qworldclock
-    src/main.cpp
-    ${UI_SOURCES}
-    ${CORE_SOURCES}
-)
+if(MSVC)
+    add_executable(qworldclock
+        WIN32
+        src/main.cpp
+        ${UI_SOURCES}
+        ${CORE_SOURCES}
+    )
+else()
+    add_executable(qworldclock
+        src/main.cpp
+        ${UI_SOURCES}
+        ${CORE_SOURCES}
+    )
+endif()
 
 target_link_libraries(qworldclock
     PRIVATE
