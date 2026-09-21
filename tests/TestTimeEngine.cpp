@@ -14,6 +14,7 @@ private slots:
     void testSignalEmission();
     void testTimeZoneOffset();
     void testDayRollover();
+    void testLondonWinterTimeShift();
 };
 
 void TestTimeEngine::testSingleton() {
@@ -111,6 +112,36 @@ void TestTimeEngine::testDayRollover() {
         QCOMPARE(honoluluTime.date(), QDate(2026, 9, 19));
         QCOMPARE(earlyUtc.date().daysTo(honoluluTime.date()), -1);
     }
+}
+
+void TestTimeEngine::testLondonWinterTimeShift() {
+    const QTimeZone tzLondon("Europe/London");
+    QVERIFY(tzLondon.isValid());
+
+    // In 2026, the UK transitions from BST (UTC+1) to GMT (UTC+0) on Sunday, 25 October at 01:00 UTC (02:00 BST).
+    // 1. One second before transition: 2026-10-25 00:59:59 UTC
+    const QDateTime beforeShiftUtc(QDate(2026, 10, 25), QTime(0, 59, 59), QTimeZone::UTC);
+    QCOMPARE(tzLondon.offsetFromUtc(beforeShiftUtc), 3600);
+    QVERIFY(tzLondon.isDaylightTime(beforeShiftUtc));
+
+    const QDateTime londonBefore = beforeShiftUtc.toTimeZone(tzLondon);
+    QCOMPARE(londonBefore.time(), QTime(1, 59, 59));
+
+    // 2. Exactly at transition: 2026-10-25 01:00:00 UTC -> Clocks fall back to 01:00:00 GMT (UTC+0)
+    const QDateTime atShiftUtc(QDate(2026, 10, 25), QTime(1, 0, 0), QTimeZone::UTC);
+    QCOMPARE(tzLondon.offsetFromUtc(atShiftUtc), 0);
+    QVERIFY(!tzLondon.isDaylightTime(atShiftUtc));
+
+    const QDateTime londonAfter = atShiftUtc.toTimeZone(tzLondon);
+    QCOMPARE(londonAfter.time(), QTime(1, 0, 0));
+
+    // 3. Middle of winter: 2026-12-15 12:00:00 UTC -> UTC+0
+    const QDateTime winterUtc(QDate(2026, 12, 15), QTime(12, 0, 0), QTimeZone::UTC);
+    QCOMPARE(tzLondon.offsetFromUtc(winterUtc), 0);
+    QVERIFY(!tzLondon.isDaylightTime(winterUtc));
+
+    const QDateTime londonWinter = winterUtc.toTimeZone(tzLondon);
+    QCOMPARE(londonWinter.time(), QTime(12, 0, 0));
 }
 
 QTEST_MAIN(TestTimeEngine)
