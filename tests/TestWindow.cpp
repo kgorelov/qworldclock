@@ -24,6 +24,7 @@ private slots:
     void testEndToEndPersistence();
     void testWorkingHoursAndOverride();
     void testCaptionFontSizeAndOverride();
+    void testRestartNoOverlapWhenClocksReordered();
 
 private:
     QString m_testDir;
@@ -449,6 +450,103 @@ void TestWindow::testCaptionFontSizeAndOverride() {
         QVERIFY(!tokyoCard->hasCustomCaptionFontSize());
         QCOMPARE(tokyoCard->effectiveCaptionFontSize(), 20);
         QCOMPARE(tokyoCard->captionLabel()->fontSize(), 20);
+    }
+}
+
+void TestWindow::testRestartNoOverlapWhenClocksReordered() {
+    const QString cfgPath = m_testDir + QStringLiteral("/reorder_no_overlap.cfg");
+
+    QString londonId;
+    QString tokyoId;
+
+    // Session 1: Add clock to Left and to Right, then swap
+    {
+        MainWindow session1(cfgPath);
+        session1.resize(1100, 650);
+        session1.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&session1));
+        qApp->processEvents();
+
+        auto *panel = session1.findChild<ClockGridPanel *>();
+        QVERIFY(panel != nullptr);
+
+        // Add London to Left of local
+        QVERIFY(panel->addClockRelative(QStringLiteral("clock-local"),
+                                        Direction::Left,
+                                        QTimeZone("Europe/London"),
+                                        QStringLiteral("London")));
+        qApp->processEvents();
+
+        // Add Tokyo to Right of local
+        QVERIFY(panel->addClockRelative(QStringLiteral("clock-local"),
+                                        Direction::Right,
+                                        QTimeZone("Asia/Tokyo"),
+                                        QStringLiteral("Tokyo")));
+        qApp->processEvents();
+
+        QCOMPARE(panel->model()->count(), 3);
+
+        for (const auto &c : panel->model()->clocks()) {
+            if (c.caption == QStringLiteral("London")) {
+                londonId = c.id;
+            } else if (c.caption == QStringLiteral("Tokyo")) {
+                tokyoId = c.id;
+            }
+        }
+        QVERIFY(!londonId.isEmpty());
+        QVERIFY(!tokyoId.isEmpty());
+
+        // Swap London and Tokyo
+        QVERIFY(panel->model()->swapClocks(londonId, tokyoId));
+        qApp->processEvents();
+
+        session1.close();
+    }
+
+    // Session 2: Reload and verify no overlapping clocks
+    {
+        MainWindow session2(cfgPath);
+        session2.resize(1100, 650);
+        session2.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&session2));
+        qApp->processEvents();
+
+        auto *panel = session2.findChild<ClockGridPanel *>();
+        QVERIFY(panel != nullptr);
+
+        QCOMPARE(panel->model()->count(), 3);
+        QCOMPARE(panel->model()->columnCount(), 3);
+
+        auto *localCard = panel->cardWidget(QStringLiteral("clock-local"));
+        auto *londonCard = panel->cardWidget(londonId);
+        auto *tokyoCard = panel->cardWidget(tokyoId);
+
+        QVERIFY(localCard != nullptr);
+        QVERIFY(londonCard != nullptr);
+        QVERIFY(tokyoCard != nullptr);
+
+        // Grid columns must all be different
+        const int colLocal = localCard->gridCol();
+        const int colLondon = londonCard->gridCol();
+        const int colTokyo = tokyoCard->gridCol();
+
+        QVERIFY(colLocal != colLondon);
+        QVERIFY(colLocal != colTokyo);
+        QVERIFY(colLondon != colTokyo);
+
+        // All three cards must be at row 0
+        QCOMPARE(localCard->gridRow(), 0);
+        QCOMPARE(londonCard->gridRow(), 0);
+        QCOMPARE(tokyoCard->gridRow(), 0);
+
+        // Geometries in panel must not intersect
+        const QRect geomLocal = localCard->geometry();
+        const QRect geomLondon = londonCard->geometry();
+        const QRect geomTokyo = tokyoCard->geometry();
+
+        QVERIFY(!geomLocal.intersects(geomLondon));
+        QVERIFY(!geomLocal.intersects(geomTokyo));
+        QVERIFY(!geomLondon.intersects(geomTokyo));
     }
 }
 

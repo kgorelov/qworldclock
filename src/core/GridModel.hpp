@@ -2,6 +2,7 @@
 
 #include "core/WorkingHours.hpp"
 
+#include <QList>
 #include <QObject>
 #include <QString>
 #include <QTimeZone>
@@ -42,6 +43,8 @@ public:
 
     // Clock operations
     bool addClock(const ClockItem &item);
+    bool setClocks(const std::vector<ClockItem> &items);
+    bool setClocks(const QList<ClockItem> &items);
     bool insertRelative(const QString &referenceId, Direction direction, const ClockItem &newItem);
     bool removeClock(const QString &id);
     bool swapClocks(const QString &id1, const QString &id2);

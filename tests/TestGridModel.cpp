@@ -18,6 +18,9 @@ private slots:
     void testSwapAndMove();
     void testClockWorkingHours();
     void testClockCaptionFontSize();
+    void testRestartOverlapBug();
+    void testRestartAfterInsertLeft();
+    void testCorruptedConfigRecovery();
 };
 
 void TestGridModel::testInitialState() {
@@ -242,6 +245,90 @@ void TestGridModel::testClockCaptionFontSize() {
 
     // Non-existent ID returns false
     QVERIFY(!model.setClockCaptionFontSize(QStringLiteral("non-existent"), true, 18));
+}
+
+void TestGridModel::testRestartOverlapBug() {
+    GridModel model;
+    model.addClock({QStringLiteral("c1"), QTimeZone::systemTimeZone(), QStringLiteral("Local"), 0, 0});
+    model.insertRelative(QStringLiteral("c1"), Direction::Right,
+                         {QStringLiteral("c2"), QTimeZone::systemTimeZone(), QStringLiteral("London"), 0, 0});
+
+    // Swap clocks so c1 is at col 1 and c2 is at col 0
+    QVERIFY(model.swapClocks(QStringLiteral("c1"), QStringLiteral("c2")));
+    QCOMPARE(model.clockById(QStringLiteral("c1"))->col, 1);
+    QCOMPARE(model.clockById(QStringLiteral("c2"))->col, 0);
+
+    // Simulate saving to config and reloading into a new GridModel via addClock
+    GridModel reloaded;
+    for (const auto &item : model.clocks()) {
+        reloaded.addClock(item);
+    }
+
+    // Now check if positions were preserved
+    auto rc1 = reloaded.clockById(QStringLiteral("c1"));
+    auto rc2 = reloaded.clockById(QStringLiteral("c2"));
+    QVERIFY(rc1.has_value());
+    QVERIFY(rc2.has_value());
+
+    // Expect: c1 at col 1, c2 at col 0, and columnCount == 2
+    QCOMPARE(rc1->col, 1);
+    QCOMPARE(rc2->col, 0);
+    QCOMPARE(reloaded.columnCount(), 2);
+}
+
+void TestGridModel::testRestartAfterInsertLeft() {
+    GridModel model;
+    model.addClock({QStringLiteral("local"), QTimeZone::systemTimeZone(), QStringLiteral("Local"), 0, 0});
+    // Add new clock to the left of local clock
+    QVERIFY(model.insertRelative(QStringLiteral("local"), Direction::Left,
+                                 {QStringLiteral("ny"), QTimeZone::systemTimeZone(), QStringLiteral("New York"), 0, 0}));
+
+    // In model: ny at (0, 0), local at (0, 1)
+    auto ny = model.clockById(QStringLiteral("ny"));
+    auto local = model.clockById(QStringLiteral("local"));
+    QVERIFY(ny.has_value());
+    QVERIFY(local.has_value());
+    QCOMPARE(ny->col, 0);
+    QCOMPARE(local->col, 1);
+
+    // Simulate saving and restoring via setClocks
+    GridModel reloaded;
+    reloaded.setClocks(model.clocks());
+
+    auto rny = reloaded.clockById(QStringLiteral("ny"));
+    auto rlocal = reloaded.clockById(QStringLiteral("local"));
+    QVERIFY(rny.has_value());
+    QVERIFY(rlocal.has_value());
+    QCOMPARE(rny->col, 0);
+    QCOMPARE(rlocal->col, 1);
+    QCOMPARE(reloaded.columnCount(), 2);
+    QVERIFY(rny->col != rlocal->col);
+}
+
+void TestGridModel::testCorruptedConfigRecovery() {
+    // Simulate loading a config that already contains corrupted duplicate positions
+    std::vector<ClockItem> corrupted = {
+        {QStringLiteral("c1"), QTimeZone::systemTimeZone(), QStringLiteral("Clock 1"), 0, 0},
+        {QStringLiteral("c2"), QTimeZone::systemTimeZone(), QStringLiteral("Clock 2"), 0, 0},
+        {QStringLiteral("c3"), QTimeZone::systemTimeZone(), QStringLiteral("Clock 3"), 0, 0}
+    };
+
+    GridModel model;
+    model.setClocks(corrupted);
+
+    QCOMPARE(model.count(), 3);
+    auto c1 = model.clockById(QStringLiteral("c1"));
+    auto c2 = model.clockById(QStringLiteral("c2"));
+    auto c3 = model.clockById(QStringLiteral("c3"));
+    QVERIFY(c1.has_value());
+    QVERIFY(c2.has_value());
+    QVERIFY(c3.has_value());
+
+    // All three clocks must have unique columns
+    QVERIFY(c1->col != c2->col);
+    QVERIFY(c1->col != c3->col);
+    QVERIFY(c2->col != c3->col);
+    QCOMPARE(model.columnCount(), 3);
 }
 
 QTEST_MAIN(TestGridModel)

@@ -702,8 +702,8 @@ void MainWindow::loadConfig() {
     // 1. Clocks
     if (m_gridModel) {
         m_gridModel->blockSignals(true);
-        m_gridModel->clear();
         if (cfg.clocks.isEmpty()) {
+            m_gridModel->clear();
             m_gridModel->addClock({
                 QStringLiteral("clock-local"),
                 QTimeZone::systemTimeZone(),
@@ -712,9 +712,7 @@ void MainWindow::loadConfig() {
                 0
             });
         } else {
-            for (const auto &item : cfg.clocks) {
-                m_gridModel->addClock(item);
-            }
+            m_gridModel->setClocks(cfg.clocks);
         }
         m_gridModel->blockSignals(false);
     }

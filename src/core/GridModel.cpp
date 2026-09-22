@@ -15,11 +15,43 @@ bool GridModel::addClock(const ClockItem &item) {
         return false;
     }
 
-    m_clocks.push_back(item);
-    normalizeCoordinates();
+    ClockItem toAdd = item;
+    toAdd.row = std::max(0, toAdd.row);
+    toAdd.col = std::max(0, toAdd.col);
+
+    // If target position is already occupied, find next available col in that row
+    while (clockAt(toAdd.row, toAdd.col).has_value()) {
+        toAdd.col++;
+    }
+
+    m_clocks.push_back(toAdd);
     emit clockAdded(m_clocks.back());
     emit layoutChanged();
     return true;
+}
+
+bool GridModel::setClocks(const std::vector<ClockItem> &items) {
+    m_clocks.clear();
+    for (const auto &item : items) {
+        if (findById(item.id) == m_clocks.end() && !item.id.isEmpty()) {
+            ClockItem toAdd = item;
+            toAdd.row = std::max(0, toAdd.row);
+            toAdd.col = std::max(0, toAdd.col);
+            m_clocks.push_back(toAdd);
+        }
+    }
+    normalizeCoordinates();
+    emit layoutChanged();
+    return true;
+}
+
+bool GridModel::setClocks(const QList<ClockItem> &items) {
+    std::vector<ClockItem> vec;
+    vec.reserve(items.size());
+    for (const auto &item : items) {
+        vec.push_back(item);
+    }
+    return setClocks(vec);
 }
 
 bool GridModel::insertRelative(const QString &referenceId, Direction direction, const ClockItem &newItem) {
@@ -134,6 +166,7 @@ bool GridModel::swapClocks(const QString &id1, const QString &id2) {
 
     std::swap(it1->row, it2->row);
     std::swap(it1->col, it2->col);
+    normalizeCoordinates();
     emit layoutChanged();
     return true;
 }
@@ -254,6 +287,25 @@ void GridModel::normalizeCoordinates() {
         return;
     }
 
+    // 1. Resolve duplicate/overlapping coordinates (e.g. recovering from corrupted configs)
+    std::set<std::pair<int, int>> occupied;
+    for (auto &clock : m_clocks) {
+        clock.row = std::max(0, clock.row);
+        clock.col = std::max(0, clock.col);
+        if (occupied.contains({clock.row, clock.col})) {
+            int newCol = clock.col + 1;
+            while (occupied.contains({clock.row, newCol}) ||
+                   std::any_of(m_clocks.begin(), m_clocks.end(), [&](const ClockItem &c) {
+                       return &c != &clock && c.row == clock.row && c.col == newCol;
+                   })) {
+                newCol++;
+            }
+            clock.col = newCol;
+        }
+        occupied.insert({clock.row, clock.col});
+    }
+
+    // 2. Eliminate gaps in row and column indices
     std::set<int> uniqueRows;
     std::set<int> uniqueCols;
     for (const auto &clock : m_clocks) {
@@ -277,6 +329,14 @@ void GridModel::normalizeCoordinates() {
         clock.row = rowMapping[clock.row];
         clock.col = colMapping[clock.col];
     }
+
+    // 3. Keep m_clocks in consistent row-major order
+    std::sort(m_clocks.begin(), m_clocks.end(), [](const ClockItem &a, const ClockItem &b) {
+        if (a.row != b.row) {
+            return a.row < b.row;
+        }
+        return a.col < b.col;
+    });
 }
 
 std::vector<ClockItem>::iterator GridModel::findById(const QString &id) {
