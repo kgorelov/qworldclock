@@ -51,6 +51,15 @@ set(UI_SOURCES
     src/ui/WorkingHoursDialog.cpp
 )
 
+# Application resources
+set(APP_RESOURCES
+    resources/resources.qrc
+)
+
+if(WIN32)
+    list(APPEND APP_RESOURCES resources/qworldclock.rc)
+endif()
+
 # Main executable
 if(MSVC)
     add_executable(qworldclock
@@ -58,12 +67,14 @@ if(MSVC)
         src/main.cpp
         ${UI_SOURCES}
         ${CORE_SOURCES}
+        ${APP_RESOURCES}
     )
 else()
     add_executable(qworldclock
         src/main.cpp
         ${UI_SOURCES}
         ${CORE_SOURCES}
+        ${APP_RESOURCES}
     )
 endif()
 
@@ -136,6 +147,10 @@ if(UNIX AND NOT APPLE)
     install(
         FILES resources/icons/qworldclock.png
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
+    )
+    install(
+        FILES resources/icons/qworldclock.svg
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
     )
     install(
         FILES resources/qworldclock.desktop
