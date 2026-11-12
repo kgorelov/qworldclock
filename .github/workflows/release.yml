@@ -75,16 +75,19 @@ jobs:
           chmod +x package_bundle/qworldclock/qworldclock
           tar -czvf "dist/qworldclock-${TAG_NAME}-linux-x86_64-bundle.tar.gz" -C package_bundle qworldclock
 
+      - name: Install Windows packaging tools
+        if: matrix.platform == 'windows-x64'
+        shell: bash
+        run: |
+          choco install innosetup wixtoolset -y
+          echo "C:\Program Files (x86)\Inno Setup 6" >> "$GITHUB_PATH"
+          echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" >> "$GITHUB_PATH"
+
       - name: Package Windows
         if: matrix.platform == 'windows-x64'
         shell: bash
         run: |
-          mkdir -p dist package/qworldclock
-          cp build/qworldclock.exe package/qworldclock/
-          cp build/*.dll package/qworldclock/
-          cp -r build/platforms package/qworldclock/
-          TAG_NAME="${GITHUB_REF_NAME//\//-}"
-          cmake -E chdir package cmake -E tar cfv "../dist/qworldclock-${TAG_NAME}-windows-x64.zip" --format=zip qworldclock
+          pixi run package
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

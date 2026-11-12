@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="QWorldClock"
+           Language="1033"
+           Version="$(var.Version)"
+           Manufacturer="Kirill Gorelov"
+           UpgradeCode="8408ADBA-0BC9-4EFC-BECC-042B45780558">
+
+    <Package InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perMachine"
+             Platform="x64"
+             Description="Multi-timezone world clock desktop application"
+             Comments="QWorldClock $(var.Version) installer" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="AppIcon" SourceFile="$(var.IconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/kgorelov/qworldclock" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/kgorelov/qworldclock" />
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="QWorldClock" />
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="QWorldClock" />
+      </Directory>
+    </Directory>
+
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcuts" Guid="F60AC333-A8E1-4802-BF64-3B8A1608DCFC">
+        <Shortcut Id="AppStartMenuShortcut"
+                  Name="QWorldClock"
+                  Description="Multi-timezone world clock desktop application"
+                  Target="[INSTALLFOLDER]qworldclock.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AppIcon" />
+        <RemoveFolder Id="CleanUpShortCut" Directory="ApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\QWorldClock" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <Feature Id="MainApplication" Title="QWorldClock" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="ApplicationShortcuts" />
+    </Feature>
+
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+    <UIRef Id="WixUI_Minimal" />
+  </Product>
+</Wix>

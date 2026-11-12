@@ -19,3 +19,7 @@ build = { cmd = "cmake --build build", depends-on = ["configure"] }
 test = { cmd = "ctest --test-dir build --output-on-failure", depends-on = ["build"] }
 run = { cmd = "./build/qworldclock", depends-on = ["build"] }
 appimage = { cmd = "scripts/build_appimage.sh", depends-on = ["build"] }
+
+[target.win-64.tasks]
+run = { cmd = "build/qworldclock.exe", depends-on = ["build"] }
+package = { cmd = "bash scripts/package_windows.sh", depends-on = ["build"] }

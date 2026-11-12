@@ -6,3 +6,8 @@ CMakeUserPresets.json
 build_tools/
 AppDir/
 *.AppImage
+dist/
+package/
+package_*/
+*.wixobj
+*.wixpdb
