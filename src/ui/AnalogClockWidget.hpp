@@ -42,6 +42,7 @@ private:
     void drawDial(QPainter &painter, double radius, bool isNight);
     void drawTicks(QPainter &painter, double radius, bool isNight);
     void drawHands(QPainter &painter, double radius, const QTime &time, bool isNight);
+    void drawAmPmIndicator(QPainter &painter, double radius, const QTime &time);
 
     QTimeZone m_timeZone;
     QDateTime m_currentUtcTime;

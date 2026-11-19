@@ -99,6 +99,7 @@ void AnalogClockWidget::paintEvent(QPaintEvent * /*event*/) {
     drawDial(painter, radius, night);
     drawTicks(painter, radius, night);
     drawHands(painter, radius, time, night);
+    drawAmPmIndicator(painter, radius, time);
 
     painter.restore();
 }
@@ -220,6 +221,27 @@ void AnalogClockWidget::drawHands(QPainter &painter, double radius, const QTime 
     painter.setPen(Qt::NoPen);
     painter.setBrush(isNight ? QColor(0x0f, 0x17, 0x2a) : QColor(0xff, 0xff, 0xff));
     painter.drawEllipse(QPointF(0, 0), pivotRadius * 0.35, pivotRadius * 0.35);
+}
+
+void AnalogClockWidget::drawAmPmIndicator(QPainter &painter, double radius, const QTime &time) {
+    const bool isPm = time.hour() >= 12;
+    const QString text = isPm ? QStringLiteral("PM") : QStringLiteral("AM");
+    const QColor color = isPm ? QColor(0x1e, 0x3a, 0x8a) : QColor(0x02, 0x84, 0xc7);
+
+    QFont font = painter.font();
+    font.setBold(true);
+    font.setPointSizeF(qBound(8.0, radius * 0.13, 16.0));
+    painter.setFont(font);
+    painter.setPen(color);
+
+    const double halfSide = radius + 6.0;
+    const double inset = 2.0;
+    const QRectF cornerRect = isPm
+        ? QRectF(0.0, -halfSide + inset, halfSide - inset, halfSide - inset)
+        : QRectF(-halfSide + inset, -halfSide + inset, halfSide - inset, halfSide - inset);
+    const Qt::Alignment alignment = isPm ? (Qt::AlignRight | Qt::AlignTop) : (Qt::AlignLeft | Qt::AlignTop);
+
+    painter.drawText(cornerRect, alignment, text);
 }
 
 } // namespace qworldclock

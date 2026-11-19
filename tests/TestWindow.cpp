@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QDir>
+#include <QImage>
 #include <QMenuBar>
 #include <QScrollArea>
 #include <QScrollBar>
@@ -25,6 +26,7 @@ private slots:
     void testWorkingHoursAndOverride();
     void testCaptionFontSizeAndOverride();
     void testRestartNoOverlapWhenClocksReordered();
+    void testAmPmCornerIndicator();
 
 private:
     QString m_testDir;
@@ -548,6 +550,63 @@ void TestWindow::testRestartNoOverlapWhenClocksReordered() {
         QVERIFY(!geomLocal.intersects(geomTokyo));
         QVERIFY(!geomLondon.intersects(geomTokyo));
     }
+}
+
+void TestWindow::testAmPmCornerIndicator() {
+    auto countPixelsMatching = [](const QImage &img, const QRect &region, auto predicate) {
+        int count = 0;
+        for (int y = region.top(); y <= region.bottom(); ++y) {
+            for (int x = region.left(); x <= region.right(); ++x) {
+                if (predicate(img.pixelColor(x, y))) {
+                    ++count;
+                }
+            }
+        }
+        return count;
+    };
+
+    auto isLightBlue = [](const QColor &c) {
+        return c.alpha() > 0 && c.blue() > 170 && c.green() > 110 && c.red() < 100;
+    };
+    auto isDarkBlue = [](const QColor &c) {
+        return c.alpha() > 0 && c.blue() > 100 && c.blue() > c.red() + 60 && c.red() < 80 && c.green() < 100;
+    };
+
+    AnalogClockWidget clock;
+    clock.resize(190, 190);
+
+    const QRect topLeft(0, 0, 35, 30);
+    const QRect topRight(155, 0, 35, 30);
+
+    // 1. 09:30 UTC -> AM in top-left (light blue), nothing in top-right
+    clock.setTimeZone(QTimeZone::utc());
+    clock.setTime(QDateTime(QDate(2026, 1, 15), QTime(9, 30, 0), QTimeZone::utc()));
+
+    QImage amImg(clock.size(), QImage::Format_ARGB32_Premultiplied);
+    amImg.fill(Qt::white);
+    clock.render(&amImg);
+
+    QVERIFY(countPixelsMatching(amImg, topLeft, isLightBlue) > 10);
+    QCOMPARE(countPixelsMatching(amImg, topRight, isDarkBlue), 0);
+
+    // 2. 15:30 UTC -> PM in top-right (dark blue), nothing in top-left
+    clock.setTime(QDateTime(QDate(2026, 1, 15), QTime(15, 30, 0), QTimeZone::utc()));
+
+    QImage pmImg(clock.size(), QImage::Format_ARGB32_Premultiplied);
+    pmImg.fill(Qt::white);
+    clock.render(&pmImg);
+
+    QVERIFY(countPixelsMatching(pmImg, topRight, isDarkBlue) > 10);
+    QCOMPARE(countPixelsMatching(pmImg, topLeft, isLightBlue), 0);
+
+    // 3. Same 15:30 UTC in America/New_York (10:30 AM) -> AM in top-left
+    clock.setTimeZone(QTimeZone("America/New_York"));
+    QImage nyImg(clock.size(), QImage::Format_ARGB32_Premultiplied);
+    nyImg.fill(Qt::white);
+    clock.render(&nyImg);
+
+    QVERIFY(countPixelsMatching(nyImg, topLeft, isLightBlue) > 10);
+    QCOMPARE(countPixelsMatching(nyImg, topRight, isDarkBlue), 0);
 }
 
 QTEST_MAIN(TestWindow)
