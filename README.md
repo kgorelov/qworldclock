@@ -13,7 +13,10 @@ A sleek, modern multi-timezone world clock desktop application built with C++20 
 
 ## Highlights
 
-- 🕒 **Analog Watchfaces with Day/Night Shading**: Beautiful analog clock dials with continuous hour, minute, and orange second hands. Clocks automatically switch between light dials (business/daylight hours) and dark dials (night/off-hours) so you can tell at a glance whether teammates are online.
+- 🕒 **Analog Watchfaces with Day/Night Shading & AM/PM Indicators**: Beautiful analog clock dials with continuous hour, minute, and orange second hands. Clocks automatically switch between light dials (business/daylight hours) and dark dials (night/off-hours) so you can tell at a glance whether teammates are online, with **AM** (sky blue, top-left) and **PM** (dark blue, top-right) corner indicators for each time zone.
+- ⏱️ **Interactive Time Converter (Drag & Scroll)**:
+  - Need to check *"What time is it in New York when it's 8 AM in London?"* — click and drag any clock's hands (near the hour hand for 12-hour turns, or elsewhere on the dial for 1-hour turns) or scroll the mouse wheel (`15 min` per notch; hold `Shift` for `1 min`, `Ctrl` for `1 hour`) to move all clocks simultaneously.
+  - After 10 seconds of inactivity, all clocks automatically return to the current live time and resume ticking.
 - 💼 **Configurable Working Hours**:
   - Global default schedule (e.g. `08:00 - 18:00`, `09:00 - 17:00`, or custom).
   - Per-clock context menu override to match local office schedules, shift rotations, or individual working hours.
@@ -196,18 +199,19 @@ qworldclock/
 ├── src/
 │   ├── main.cpp                     # Application entry point
 │   ├── core/
-│   │   ├── TimeEngine.{hpp,cpp}     # Central precision clock timer (100 ms cadence)
+│   │   ├── TimeEngine.{hpp,cpp}     # Central precision clock timer & time-preview auto-reset
 │   │   ├── GridModel.{hpp,cpp}      # 2D grid topology, clock items, normalization
 │   │   └── ConfigManager.{hpp,cpp}  # TOML serialization, migrations, error fallback
 │   └── ui/
 │       ├── MainWindow.{hpp,cpp}     # Top-level window, menus, action dispatching
 │       ├── ClockGridPanel.{hpp,cpp} # Scrollable 2D card layout, alignment, context menus
 │       ├── ClockCardWidget.{hpp,cpp}# Card container, drag-and-drop, edit overlay
-│       ├── AnalogClockWidget.{hpp,cpp}# Vector watchface rendering (hands, dial, shading)
+│       ├── AnalogClockWidget.{hpp,cpp}# Vector watchface rendering, AM/PM badge, drag/scroll
 │       ├── CaptionLabel.{hpp,cpp}   # High-DPI title and subtitle time/offset renderer
 │       ├── TimeZoneDialog.{hpp,cpp} # Filterable IANA time zone table browser
 │       └── WorkingHoursDialog.{hpp,cpp} # Visual working hours schedule editor
 ├── tests/
+│   ├── TestTimeEngine.cpp           # Time engine ticks, DST transitions, and preview reset
 │   ├── TestGridModel.cpp            # Grid mutations, relative insertions, reordering tests
 │   ├── TestConfigManager.cpp        # TOML round-trip serialization and recovery tests
 │   └── TestWindow.cpp               # End-to-end window layout, persistence, and override tests
