@@ -5,6 +5,8 @@
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QTest>
+#include <QWheelEvent>
+#include "core/TimeEngine.hpp"
 #include "ui/AnalogClockWidget.hpp"
 #include "ui/CaptionLabel.hpp"
 #include "ui/ClockCardWidget.hpp"
@@ -27,6 +29,7 @@ private slots:
     void testCaptionFontSizeAndOverride();
     void testRestartNoOverlapWhenClocksReordered();
     void testAmPmCornerIndicator();
+    void testClockDragAndScrollUpdatesAllClocks();
 
 private:
     QString m_testDir;
@@ -607,6 +610,69 @@ void TestWindow::testAmPmCornerIndicator() {
 
     QVERIFY(countPixelsMatching(nyImg, topLeft, isLightBlue) > 10);
     QCOMPARE(countPixelsMatching(nyImg, topRight, isDarkBlue), 0);
+}
+
+void TestWindow::testClockDragAndScrollUpdatesAllClocks() {
+    const QString cfgPath = m_testDir + QStringLiteral("/drag_scroll.cfg");
+    MainWindow window(cfgPath);
+    window.resize(900, 650);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    qApp->processEvents();
+
+    auto *panel = window.findChild<ClockGridPanel *>();
+    QVERIFY(panel != nullptr);
+    QVERIFY(panel->addClockRelative(QStringLiteral("clock-local"), Direction::Right,
+                                    QTimeZone("America/New_York"), QStringLiteral("New York")));
+    qApp->processEvents();
+
+    auto *localCard = panel->cardWidget(QStringLiteral("clock-local"));
+    QVERIFY(localCard != nullptr);
+    QCOMPARE(panel->model()->count(), 2);
+
+    ClockCardWidget *nyCard = nullptr;
+    for (const auto &cfg : panel->model()->clocks()) {
+        if (cfg.id != QStringLiteral("clock-local")) {
+            nyCard = panel->cardWidget(cfg.id);
+            break;
+        }
+    }
+    QVERIFY(nyCard != nullptr);
+
+    AnalogClockWidget *clock1 = localCard->analogClock();
+    AnalogClockWidget *clock2 = nyCard->analogClock();
+    QVERIFY(clock1 != nullptr);
+    QVERIFY(clock2 != nullptr);
+
+    const QDateTime startUtc(QDate(2026, 1, 15), QTime(12, 0, 0), QTimeZone::UTC);
+    TimeEngine::instance().setPreviewTime(startUtc);
+    qApp->processEvents();
+
+    QCOMPARE(clock1->localTime().toUTC(), startUtc);
+    QCOMPARE(clock2->localTime().toUTC(), startUtc);
+
+    // 1. Scroll wheel up by 1 notch (+15 minutes = +900s) on clock1
+    const QPointF center(clock1->width() / 2.0, clock1->height() / 2.0);
+    QWheelEvent wheelUp(center, clock1->mapToGlobal(center), QPoint(0, 0), QPoint(0, 120),
+                        Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+    QApplication::sendEvent(clock1, &wheelUp);
+    qApp->processEvents();
+
+    QCOMPARE(clock1->localTime().toUTC(), startUtc.addSecs(900));
+    QCOMPARE(clock2->localTime().toUTC(), startUtc.addSecs(900));
+
+    // 2. Drag clockwise by 90 degrees (from 12 o'clock to 3 o'clock -> +15 minutes = +900s)
+    const QPoint topPos(clock1->width() / 2, 15);
+    const QPoint rightPos(clock1->width() - 15, clock1->height() / 2);
+    QTest::mousePress(clock1, Qt::LeftButton, Qt::NoModifier, topPos);
+    QTest::mouseMove(clock1, rightPos);
+    QTest::mouseRelease(clock1, Qt::LeftButton, Qt::NoModifier, rightPos);
+    qApp->processEvents();
+
+    QVERIFY(qAbs(clock1->localTime().toUTC().secsTo(startUtc.addSecs(1800))) <= 30);
+    QCOMPARE(clock1->localTime().toUTC(), clock2->localTime().toUTC());
+
+    TimeEngine::instance().resetPreviewTime();
 }
 
 QTEST_MAIN(TestWindow)

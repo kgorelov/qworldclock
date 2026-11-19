@@ -15,6 +15,7 @@ private slots:
     void testTimeZoneOffset();
     void testDayRollover();
     void testLondonWinterTimeShift();
+    void testPreviewTimeAndAutoReset();
 };
 
 void TestTimeEngine::testSingleton() {
@@ -142,6 +143,38 @@ void TestTimeEngine::testLondonWinterTimeShift() {
 
     const QDateTime londonWinter = winterUtc.toTimeZone(tzLondon);
     QCOMPARE(londonWinter.time(), QTime(12, 0, 0));
+}
+
+void TestTimeEngine::testPreviewTimeAndAutoReset() {
+    TimeEngine &engine = TimeEngine::instance();
+    engine.stop();
+    engine.resetPreviewTime();
+    engine.setPreviewTimeoutMs(150);
+
+    QSignalSpy tickSpy(&engine, &TimeEngine::tick);
+    QSignalSpy previewSpy(&engine, &TimeEngine::previewModeChanged);
+
+    const QDateTime targetUtc(QDate(2026, 5, 10), QTime(8, 0, 0), QTimeZone::UTC);
+    engine.setPreviewTime(targetUtc);
+
+    QVERIFY(engine.isPreviewActive());
+    QCOMPARE(engine.currentUtcTime(), targetUtc);
+    QCOMPARE(previewSpy.count(), 1);
+    QCOMPARE(previewSpy.last().at(0).toBool(), true);
+    QVERIFY(tickSpy.count() >= 1);
+    QCOMPARE(tickSpy.last().at(0).toDateTime(), targetUtc);
+
+    engine.adjustTimeBySeconds(3600);
+    QVERIFY(engine.isPreviewActive());
+    QCOMPARE(engine.currentUtcTime(), targetUtc.addSecs(3600));
+
+    // Wait for automatic revert to normal mode
+    QTRY_VERIFY_WITH_TIMEOUT(!engine.isPreviewActive(), 1000);
+    QCOMPARE(previewSpy.count(), 2);
+    QCOMPARE(previewSpy.last().at(0).toBool(), false);
+    QVERIFY(qAbs(engine.currentUtcTime().secsTo(QDateTime::currentDateTimeUtc())) <= 2);
+
+    engine.setPreviewTimeoutMs(10000);
 }
 
 QTEST_MAIN(TestTimeEngine)

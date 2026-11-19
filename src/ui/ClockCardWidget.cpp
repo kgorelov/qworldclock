@@ -203,6 +203,9 @@ void ClockCardWidget::setEditMode(bool editMode) {
         m_btnAddRight->setVisible(editMode);
         m_btnDelete->setVisible(editMode && m_canRemove);
         m_dragIndicator->setVisible(editMode);
+        if (m_analogClock) {
+            m_analogClock->setInteractive(!editMode);
+        }
         setCursor(editMode ? Qt::SizeAllCursor : Qt::ArrowCursor);
         updateCardStyle();
     }

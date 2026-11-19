@@ -1,8 +1,13 @@
 #include "ui/AnalogClockWidget.hpp"
+#include "core/TimeEngine.hpp"
 
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QRadialGradient>
+#include <QWheelEvent>
+
+#include <cmath>
 
 namespace qworldclock {
 
@@ -13,6 +18,7 @@ AnalogClockWidget::AnalogClockWidget(QWidget *parent)
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     setAttribute(Qt::WA_OpaquePaintEvent, false);
     setContextMenuPolicy(Qt::NoContextMenu);
+    setCursor(Qt::OpenHandCursor);
 }
 
 void AnalogClockWidget::setTimeZone(const QTimeZone &timeZone) {
@@ -66,6 +72,20 @@ void AnalogClockWidget::setWorkingHours(const WorkingHours &hours) {
 
 WorkingHours AnalogClockWidget::workingHours() const {
     return m_workingHours;
+}
+
+void AnalogClockWidget::setInteractive(bool interactive) {
+    if (m_interactive != interactive) {
+        m_interactive = interactive;
+        m_isDragging = false;
+        m_pendingSeconds = 0.0;
+        setAttribute(Qt::WA_TransparentForMouseEvents, !interactive);
+        setCursor(interactive ? Qt::OpenHandCursor : Qt::ArrowCursor);
+    }
+}
+
+bool AnalogClockWidget::isInteractive() const {
+    return m_interactive;
 }
 
 bool AnalogClockWidget::isNightTime() const {
@@ -242,6 +262,119 @@ void AnalogClockWidget::drawAmPmIndicator(QPainter &painter, double radius, cons
     const Qt::Alignment alignment = isPm ? (Qt::AlignRight | Qt::AlignTop) : (Qt::AlignLeft | Qt::AlignTop);
 
     painter.drawText(cornerRect, alignment, text);
+}
+
+double AnalogClockWidget::angleFromCenter(const QPointF &pos) const {
+    const double dx = pos.x() - width() / 2.0;
+    const double dy = pos.y() - height() / 2.0;
+    return std::atan2(dx, -dy);
+}
+
+double AnalogClockWidget::normalizeAngleDelta(double delta) {
+    constexpr double twoPi = 2.0 * M_PI;
+    while (delta > M_PI) {
+        delta -= twoPi;
+    }
+    while (delta <= -M_PI) {
+        delta += twoPi;
+    }
+    return delta;
+}
+
+bool AnalogClockWidget::isNearHourHand(const QPointF &pos, double angle) const {
+    const double side = qMin(width(), height());
+    const double radius = (side / 2.0) - 6.0;
+    if (radius <= 0.0) {
+        return false;
+    }
+
+    const double dx = pos.x() - width() / 2.0;
+    const double dy = pos.y() - height() / 2.0;
+    const double dist = std::hypot(dx, dy);
+    if (dist > radius * 0.65) {
+        return false;
+    }
+
+    const QTime time = localTime().time();
+    const double hourAngle = ((time.hour() % 12) + time.minute() / 60.0 + time.second() / 3600.0) * (2.0 * M_PI / 12.0);
+    const double minuteAngle = (time.minute() + time.second() / 60.0) * (2.0 * M_PI / 60.0);
+
+    const double hourDiff = std::abs(normalizeAngleDelta(angle - hourAngle));
+    const double minDiff = std::abs(normalizeAngleDelta(angle - minuteAngle));
+    return hourDiff < 0.45 && hourDiff <= minDiff;
+}
+
+void AnalogClockWidget::mousePressEvent(QMouseEvent *event) {
+    if (!m_interactive || event->button() != Qt::LeftButton) {
+        QWidget::mousePressEvent(event);
+        return;
+    }
+
+    m_isDragging = true;
+    m_pendingSeconds = 0.0;
+    m_lastDragAngle = angleFromCenter(event->position());
+    m_secondsPerTurn = isNearHourHand(event->position(), m_lastDragAngle) ? 43200.0 : 3600.0;
+    setCursor(Qt::ClosedHandCursor);
+    event->accept();
+}
+
+void AnalogClockWidget::mouseMoveEvent(QMouseEvent *event) {
+    if (!m_isDragging) {
+        QWidget::mouseMoveEvent(event);
+        return;
+    }
+
+    const double angle = angleFromCenter(event->position());
+    const double delta = normalizeAngleDelta(angle - m_lastDragAngle);
+    m_lastDragAngle = angle;
+
+    m_pendingSeconds += (delta / (2.0 * M_PI)) * m_secondsPerTurn;
+    const auto wholeSeconds = static_cast<qint64>(std::trunc(m_pendingSeconds));
+    if (wholeSeconds != 0) {
+        m_pendingSeconds -= static_cast<double>(wholeSeconds);
+        TimeEngine::instance().adjustTimeBySeconds(wholeSeconds);
+    }
+    event->accept();
+}
+
+void AnalogClockWidget::mouseReleaseEvent(QMouseEvent *event) {
+    if (m_isDragging && event->button() == Qt::LeftButton) {
+        m_isDragging = false;
+        m_pendingSeconds = 0.0;
+        setCursor(m_interactive ? Qt::OpenHandCursor : Qt::ArrowCursor);
+        if (TimeEngine::instance().isPreviewActive()) {
+            TimeEngine::instance().adjustTimeBySeconds(0);
+        }
+        event->accept();
+        return;
+    }
+    QWidget::mouseReleaseEvent(event);
+}
+
+void AnalogClockWidget::wheelEvent(QWheelEvent *event) {
+    if (!m_interactive) {
+        QWidget::wheelEvent(event);
+        return;
+    }
+
+    const int delta = event->angleDelta().y();
+    if (delta == 0) {
+        QWidget::wheelEvent(event);
+        return;
+    }
+
+    double secondsPerNotch = 900.0; // 15 minutes per wheel notch
+    if (event->modifiers() & Qt::ShiftModifier) {
+        secondsPerNotch = 60.0;
+    } else if (event->modifiers() & Qt::ControlModifier) {
+        secondsPerNotch = 3600.0;
+    }
+
+    const auto deltaSeconds = static_cast<qint64>(std::llround((delta / 120.0) * secondsPerNotch));
+    if (deltaSeconds != 0) {
+        TimeEngine::instance().adjustTimeBySeconds(deltaSeconds);
+    }
+    event->accept();
 }
 
 } // namespace qworldclock

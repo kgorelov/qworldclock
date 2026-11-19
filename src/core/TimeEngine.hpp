@@ -23,8 +23,15 @@ public:
 
     QDateTime currentUtcTime() const;
 
+    void adjustTimeBySeconds(qint64 deltaSeconds);
+    void setPreviewTime(const QDateTime &utcTime);
+    void resetPreviewTime();
+    [[nodiscard]] bool isPreviewActive() const;
+    void setPreviewTimeoutMs(int ms);
+
 signals:
     void tick(const QDateTime &utcNow);
+    void previewModeChanged(bool active);
 
 private:
     explicit TimeEngine(QObject *parent = nullptr);
@@ -35,6 +42,10 @@ private:
 
     QTimer *m_timer{nullptr};
     QTimer *m_alignmentTimer{nullptr};
+    QTimer *m_previewResetTimer{nullptr};
+    bool m_previewActive{false};
+    QDateTime m_previewUtcTime;
+    int m_previewTimeoutMs{10000};
 };
 
 } // namespace qworldclock
